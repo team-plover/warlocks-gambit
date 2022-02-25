@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 use heron::prelude::*;
 
-mod ui;
 mod audio;
+mod ui;
 
 fn main() {
     let mut app = App::new();

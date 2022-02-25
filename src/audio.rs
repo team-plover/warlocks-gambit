@@ -1,5 +1,5 @@
-use bevy::prelude::{*, Plugin as BevyPlugin};
-use bevy_kira_audio::{Audio, AudioChannel as KiraChannel, AudioSource, AudioPlugin};
+use bevy::prelude::{Plugin as BevyPlugin, *};
+use bevy_kira_audio::{Audio, AudioChannel as KiraChannel, AudioPlugin, AudioSource};
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum AudioChannel {
@@ -18,7 +18,7 @@ struct AudioChannels {
     volumes: ChannelVolumes,
 }
 impl Default for AudioChannels {
-    fn default() -> Self {      
+    fn default() -> Self {
         Self {
             sfx: KiraChannel::new("sfx".to_owned()),
             music: KiraChannel::new("music".to_owned()),
@@ -31,11 +31,9 @@ struct AudioAssets {
     wood_clink: Handle<AudioSource>,
 }
 impl FromWorld for AudioAssets {
-    fn from_world(world: &mut World) -> Self {      
+    fn from_world(world: &mut World) -> Self {
         let assets = world.get_resource::<AssetServer>().unwrap();
-        Self {
-            wood_clink: assets.load("wood_clink.ogg"),
-        }
+        Self { wood_clink: assets.load("wood_clink.ogg") }
     }
 }
 
@@ -88,12 +86,11 @@ fn play_audio(
 
 pub struct Plugin;
 impl BevyPlugin for Plugin {
-    fn build(&self, app: &mut App) {      
+    fn build(&self, app: &mut App) {
         app.add_plugin(AudioPlugin)
             .init_resource::<AudioChannels>()
             .init_resource::<AudioAssets>()
             .add_event::<AudioRequest>()
-            .add_system(play_audio)
-            ;
+            .add_system(play_audio);
     }
 }

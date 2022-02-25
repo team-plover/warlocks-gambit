@@ -1,9 +1,11 @@
-use bevy::prelude::{*, Plugin as BevyPlugin};
+use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy::{app::AppExit, input::mouse::MouseMotion, math::Vec3Swizzles};
-use bevy_ui_navigation::{systems as nav, NavigationPlugin, Focused, Focusable, NavEvent, NavRequest};
 use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
+use bevy_ui_navigation::{
+    systems as nav, Focusable, Focused, NavEvent, NavRequest, NavigationPlugin,
+};
 
-use crate::audio::{AudioRequest, SfxParam, AudioChannel};
+use crate::audio::{AudioChannel, AudioRequest, SfxParam};
 
 #[derive(Clone, Component, Default)]
 struct MenuCursor {
@@ -35,7 +37,7 @@ struct MenuAssets {
     font: Handle<Font>,
 }
 impl FromWorld for MenuAssets {
-    fn from_world(world: &mut World) -> Self {      
+    fn from_world(world: &mut World) -> Self {
         let assets = world.get_resource::<AssetServer>().unwrap();
         Self {
             font: assets.load("Boogaloo-Regular.otf"),
@@ -57,7 +59,9 @@ fn update_sliders(
 ) {
     use MainMenuElem::AudioSlider;
     if let Ok((entity, mut style, mut elem)) = styles.get_single_mut() {
-         if let (Val::Percent(left), AudioSlider(channel, strength)) = (style.position.left, elem.as_mut()) {
+        if let (Val::Percent(left), AudioSlider(channel, strength)) =
+            (style.position.left, elem.as_mut())
+        {
             let horizontal_delta: f32 = mouse_motion.iter().map(|m| m.delta.x).sum();
             let new_left = (left / 0.9 + horizontal_delta * 0.40).min(100.0).max(0.0);
             *strength = new_left;
@@ -83,6 +87,7 @@ fn update_menu(
     mut cursor: Query<&mut MenuCursor>,
     mut exit: EventWriter<AppExit>,
     mut cmds: Commands,
+    mut audio_requests: EventWriter<AudioRequest>,
     elems: Query<(&Node, &GlobalTransform, &MainMenuElem)>,
 ) {
     for nav_event in events.iter() {
@@ -101,6 +106,9 @@ fn update_menu(
             NavEvent::NoChanges { from, request: NavRequest::Action } => {
                 match elems.get(*from.first()).map(|t| t.2) {
                     Ok(MainMenuElem::Exit) => exit.send(AppExit),
+                    Ok(MainMenuElem::Start) => {
+                        audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
+                    }
                     _ => {}
                 }
             }
@@ -134,24 +142,26 @@ fn update_highlight(mut highlight: Query<(&mut Style, &mut Node, &MenuCursor)>) 
 }
 
 /// Spawns the UI tree
-fn setup_main_menu(
-    mut cmds: Commands,
-    menu_assets: Res<MenuAssets>,
-) {
-    use PositionType as PT;
+fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>) {
     use FlexDirection as FD;
-    use MainMenuElem::{Credits, Start, Exit};
+    use MainMenuElem::{Credits, Exit, Start};
+    use PositionType as PT;
 
     let text_bundle = |content: &str| {
         let color = Color::ANTIQUE_WHITE;
         let horizontal = HorizontalAlign::Left;
-        let style = TextStyle { color, font: menu_assets.font.clone(), font_size: 60.0 };
+        let style = TextStyle {
+            color,
+            font: menu_assets.font.clone(),
+            font_size: 60.0,
+        };
         let align = TextAlignment { horizontal, ..Default::default() };
         let text = Text::with_section(content, style, align);
         TextBundle { text, ..Default::default() }
     };
     let focusable = Focusable::default();
-    let image = |image: &Handle<Image>| ImageBundle { image: image.clone().into(), ..Default::default() }; 
+    let image =
+        |image: &Handle<Image>| ImageBundle { image: image.clone().into(), ..Default::default() };
     let node = NodeBundle {
         color: Color::NONE.into(),
         style: style! {
@@ -188,7 +198,8 @@ fn setup_main_menu(
                     ]
                 )
             )
-        }.id()
+        }
+        .id()
     };
     let master_slider = slider("Master", AudioChannel::Master, 100.0);
     let sfx_slider = slider("Sfx", AudioChannel::Sfx, 50.0);
@@ -221,7 +232,7 @@ fn setup_main_menu(
 
 pub struct Plugin;
 impl BevyPlugin for Plugin {
-    fn build(&self, app: &mut App) {      
+    fn build(&self, app: &mut App) {
         app.add_plugin(NavigationPlugin)
             .init_resource::<MenuAssets>()
             .add_system(nav::default_mouse_input)
@@ -230,7 +241,6 @@ impl BevyPlugin for Plugin {
             .add_startup_system(setup_main_menu)
             .add_system(update_highlight)
             .add_system(update_sliders)
-            .add_system(update_menu)
-            ;
+            .add_system(update_menu);
     }
 }
