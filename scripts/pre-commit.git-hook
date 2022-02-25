@@ -1,0 +1,37 @@
+#!/bin/bash
+
+colorecho() {
+	OsType=${OSTYPE//[0-9.-]*/}
+	if [[ "$OsType" == "linux" ]]; then
+		# outputs string with color and then resets to default (ANSI escape sequences)
+		printf "\033[1;9%dm%s\033[0m\n" $1 "$2"
+	else
+		echo "$2"
+	fi
+}
+CheckResult=1
+
+cargo fmt -- --check
+if [ $? -ne 0 ]; then
+	cargo fmt
+	colorecho 1 "Add files and commit again (rustfmt)"
+	exit 1
+fi
+
+cargo clippy
+if [ $? -ne 0 ]; then
+	echo "pre-commit: lint failed"
+	CheckResult=0
+fi
+
+cargo test --all
+if [ $? -ne 0 ]; then
+	echo "pre-commit: tests failed"
+	CheckResult=0
+fi
+
+if [ $CheckResult -eq 1 ]; then
+	colorecho 2 "Pre-commit check passed"
+else
+	colorecho 3 "Pre-commit check passed with warnings"
+fi

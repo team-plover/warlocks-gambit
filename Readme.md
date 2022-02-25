@@ -68,6 +68,9 @@ cargo clippy
 cargo test
 ```
 
+(Or run `scripts/set_git_hooks.sh` to setup git pre-commit hook which does that for you,
+just don't forget to check the output after each `git commit`)
+
 To install those tools, read on
 * [clippy](https://github.com/rust-lang/rust-clippy) `rustup component add clippy`
 * [rustfmt](https://github.com/rust-lang/rustfmt) `rustup component add rustfmt`
