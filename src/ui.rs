@@ -1,5 +1,5 @@
 use bevy::prelude::{Plugin as BevyPlugin, *};
-use bevy::{app::AppExit, input::mouse::MouseMotion, math::Vec3Swizzles};
+use bevy::{app::AppExit, input::mouse::MouseMotion, math::Vec3Swizzles, window::WindowMode};
 use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
 use bevy_ui_navigation::{
     systems as nav, Focusable, Focused, NavEvent, NavRequest, NavigationPlugin,
@@ -27,6 +27,9 @@ enum MainMenuElem {
     Start,
     Exit,
     Credits,
+    LockMouse,
+    ToggleFullScreen,
+    Set16_9,
     AudioSlider(AudioChannel, f32),
 }
 
@@ -88,8 +91,10 @@ fn update_menu(
     mut exit: EventWriter<AppExit>,
     mut cmds: Commands,
     mut audio_requests: EventWriter<AudioRequest>,
+    mut windows: ResMut<Windows>,
     elems: Query<(&Node, &GlobalTransform, &MainMenuElem)>,
 ) {
+    let window_msg = "There is at least one game window open";
     for nav_event in events.iter() {
         match nav_event {
             NavEvent::FocusChanged { to, from } => {
@@ -108,6 +113,25 @@ fn update_menu(
                     Ok(MainMenuElem::Exit) => exit.send(AppExit),
                     Ok(MainMenuElem::Start) => {
                         audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
+                    }
+                    Ok(MainMenuElem::LockMouse) => {
+                        let window = windows.get_primary_mut().expect(window_msg);
+                        let prev_lock_mode = window.cursor_locked();
+                        window.set_cursor_lock_mode(!prev_lock_mode);
+                    }
+                    Ok(MainMenuElem::ToggleFullScreen) => {
+                        use WindowMode::*;
+                        let window = windows.get_primary_mut().expect(window_msg);
+                        let prev_mode = window.mode();
+                        let new_mode = if prev_mode == Fullscreen { Windowed } else { Fullscreen };
+                        window.set_mode(new_mode);
+                    }
+                    Ok(MainMenuElem::Set16_9) => {
+                        let window = windows.get_primary_mut().expect(window_msg);
+                        if window.mode() == WindowMode::Windowed {
+                            let height = window.height();
+                            window.set_resolution(height * 16.0 / 9.0, height);
+                        }
                     }
                     _ => {}
                 }
@@ -144,21 +168,18 @@ fn update_highlight(mut highlight: Query<(&mut Style, &mut Node, &MenuCursor)>) 
 /// Spawns the UI tree
 fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>) {
     use FlexDirection as FD;
-    use MainMenuElem::{Credits, Exit, Start};
+    use MainMenuElem::*;
     use PositionType as PT;
 
-    let text_bundle = |content: &str| {
+    let text_bundle = |content: &str, font_size: f32| {
         let color = Color::ANTIQUE_WHITE;
         let horizontal = HorizontalAlign::Left;
-        let style = TextStyle {
-            color,
-            font: menu_assets.font.clone(),
-            font_size: 60.0,
-        };
+        let style = TextStyle { color, font: menu_assets.font.clone(), font_size };
         let align = TextAlignment { horizontal, ..Default::default() };
         let text = Text::with_section(content, style, align);
         TextBundle { text, ..Default::default() }
     };
+    let large_text = |content| text_bundle(content, 60.0);
     let focusable = Focusable::default();
     let image =
         |image: &Handle<Image>| ImageBundle { image: image.clone().into(), ..Default::default() };
@@ -178,7 +199,7 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>) {
         build_ui! {
             #[cmd(cmds)]
             node { flex_direction: FD::Row }[; slider_name](
-                node[text_bundle(&volume_name);],
+                node[text_bundle(&volume_name, 30.0); style! { margin: rect!(10 px), }],
                 node(
                     entity[image(&menu_assets.slider_bg); style! { size: size!( 200 px, 20 px), }],
                     entity[
@@ -218,13 +239,22 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>) {
                 Name::new("Title Image"),
                 style! { size: size!(auto, 30 pct), }
             ],
-            node[; Name::new("Menu node")](
-                node[text_bundle("Start");   focusable, Name::new("Start button"), Start],
-                node[text_bundle("Credits"); focusable, Name::new("Credits button"), Credits],
-                node[text_bundle("Exit");    focusable, Name::new("Exit button"), Exit],
-                id(master_slider),
-                id(music_slider),
-                id(sfx_slider)
+            node{ flex_direction: FD::Row }[; Name::new("Menu columns")](
+                node[; Name::new("Menu node")](
+                    node[large_text("Start");   focusable, Name::new("Start button"), Start],
+                    node[large_text("Credits"); focusable, Name::new("Credits button"), Credits],
+                    node[large_text("Exit");    focusable, Name::new("Exit button"), Exit]
+                ),
+                node{ align_items: AlignItems::FlexEnd, margin: rect!(50 px) }[; Name::new("Audio settings")](
+                    id(master_slider),
+                    id(music_slider),
+                    id(sfx_slider)
+                ),
+                node[; Name::new("Graphics column")](
+                    node[large_text("Lock mouse cursor"); focusable, LockMouse],
+                    node[large_text("Toggle Full screen"); focusable, ToggleFullScreen],
+                    node[large_text("Make exactly 16:9"); focusable, Set16_9]
+                )
             )
         )
     };
@@ -235,10 +265,10 @@ impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(NavigationPlugin)
             .init_resource::<MenuAssets>()
-            .add_system(nav::default_mouse_input)
-            .add_system(nav::default_gamepad_input)
             .init_resource::<nav::InputMapping>()
             .add_startup_system(setup_main_menu)
+            .add_system(nav::default_mouse_input)
+            .add_system(nav::default_gamepad_input)
             .add_system(update_highlight)
             .add_system(update_sliders)
             .add_system(update_menu);
