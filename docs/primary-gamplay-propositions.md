@@ -56,6 +56,7 @@ to pull the tricks.
 
 ### Advanced card game mechanics
 
+(XO: Cut the suits entirely? Don't seem to serve any particular function and they take up space on the card)
 The card suit is based on the French suite, colors are replaced with:
 * Tentacle
 * Pentacle
