@@ -64,7 +64,7 @@ from 0 to 12. Higher value cards win over lower value cards, except 0 which beat
 
 Each card has an enochian word of magic attached to it. There is exactly 10
 words of magic (see [wikipedia](https://en.wikipedia.org/wiki/Enochian)). Words
-of magic act like special modifiers on the card or can give bonus actions to player.
+of magic act like special modifiers on the card or can give bonus actions to player. (XO: the words are ~paragraph long prayers, probably going to just have to substitute them with like, a gylph from the Enochian language, not enough space to do intricate special text in more than like ~3 character long strings, they won't really be able to actually mean anything though)
 
 TODO: design word of magic effects.
 
