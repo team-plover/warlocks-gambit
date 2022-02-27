@@ -56,12 +56,7 @@ to pull the tricks.
 
 ### Advanced card game mechanics
 
-(XO: Cut the suits entirely? Don't seem to serve any particular function and they take up space on the card)
-The card suit is based on the French suite, colors are replaced with:
-* Tentacle
-* Pentacle
-* Miracle
-* Oracle
+The cards have no suit, only color and words of magic. We could potentially add suits if we have time.
 
 The card numbers are swapped with [Maya numerals](https://en.wikipedia.org/wiki/Maya_numerals),
 from 0 to 12. Higher value cards win over lower value cards, except 0 which beats 12
