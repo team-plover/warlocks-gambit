@@ -79,9 +79,12 @@ you restart.
 
 Now game shows a prompt that tells you to "hide" a card while "the pigeon is
 not looking". You hide it, then you get a prompt to "reuse" at the next draw.
-It's a sort of quicktime even so that you can store a card between turns. If
+It's a sort of quicktime event so that you can store a card between turns. If
 you fail to properly put back the card in your hand while drawing, you get
-noticed and the pigeon use his eye lasers to kill you.
+noticed and the pigeon use his eye lasers to kill you. *(Note by blucky: I think eye lasers would be out of place but since it's a bird an option would be to have the pigeon peck you or something, or have it fly up to reveal claws that would fit a predatory bird more than a pigeon with which it will kill you.
+Another concern would be lives: should we instakill or should the pigeon cause injury first and then kill if you mess up too much?)*
+
+
 
 There are more than one trick. Some are classic tricks like marking, putting
 back in the deck etc. Some of them include magic (like making a card
