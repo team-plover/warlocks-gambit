@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 mod audio;
+mod debug_overlay;
 mod ui;
 
 fn main() {
@@ -12,6 +13,7 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
+        .add_plugin(debug_overlay::Plugin)
         .add_plugin(audio::Plugin)
         .add_plugin(ui::Plugin);
 
