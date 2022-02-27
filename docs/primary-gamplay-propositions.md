@@ -1,7 +1,6 @@
-# Wizard's Battle
+# Wizard's War
 
-Game has a premise similar to Battle (the card game, War in the US, but we
-use Battle to avoid trademark infringement). However each draw is 3 cards and
+Game has a premise similar to War (the child card game). However each draw is 3 cards and
 you get to chose which card to play until the 3 cards are exhausted and you
 draw again.
 
@@ -55,6 +54,13 @@ to pull the tricks.
 * Ends when draw pile is empty
 
 ### Advanced card game mechanics
+
+#### War
+
+If both cards played in a turn have the same value, there is "War", then all cards in hand are staked.
+The war is resolved the same way as in "War".
+
+#### Card description
 
 The cards have no suit, only color and words of magic. We could potentially add suits if we have time.
 
