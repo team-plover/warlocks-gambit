@@ -84,6 +84,7 @@ you fail to properly put back the card in your hand while drawing, you get
 noticed and the pigeon use his eye lasers to kill you. *(Note by blucky: I think eye lasers would be out of place but since it's a bird an option would be to have the pigeon peck you or something, or have it fly up to reveal claws that would fit a predatory bird more than a pigeon with which it will kill you.
 Another concern would be lives: should we instakill or should the pigeon cause injury first and then kill if you mess up too much?)*
 *(gib: I think the pigeon should flutter and make noise to make the blindfold wizard notice you and they say something like "cheater be gone!")*
+*(vasukas: Good thing about eye lasers is that no-one will expect that! And it should be faster to do than pecking animation and way cooler than just game over screen)*
 
 Each "run" should be about 5 minutes. The first one where you lose by default should be at most 2 minutes. Each cheat mistake is fatal and you should be able to restart very quickly.
 
