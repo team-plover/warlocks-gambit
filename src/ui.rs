@@ -22,6 +22,9 @@ impl MenuCursor {
 #[derive(Component)]
 struct MovingSlider;
 
+#[derive(Component, Clone)]
+struct CreditOverlay;
+
 #[derive(Component, Clone, PartialEq)]
 enum MainMenuElem {
     Start,
@@ -87,25 +90,27 @@ fn update_sliders(
 
 fn update_menu(
     mut events: EventReader<NavEvent>,
-    mut cursor: Query<&mut MenuCursor>,
     mut exit: EventWriter<AppExit>,
     mut cmds: Commands,
     mut audio_requests: EventWriter<AudioRequest>,
     mut windows: ResMut<Windows>,
+    mut credit_overlay: Query<&mut Style, With<CreditOverlay>>,
     elems: Query<(&Node, &GlobalTransform, &MainMenuElem)>,
 ) {
     let window_msg = "There is at least one game window open";
     for nav_event in events.iter() {
         match nav_event {
-            NavEvent::FocusChanged { to, from } => {
+            NavEvent::FocusChanged { from, .. } => {
                 let from = *from.first();
-                let to = *to.first();
-                let (node, transform, _) = elems.get(to).unwrap();
                 let (_, _, from_elem) = elems.get(from).unwrap();
-                let mut cursor = cursor.get_single_mut().unwrap();
-                cursor.set_target(node, transform);
                 if matches!(from_elem, MainMenuElem::AudioSlider(..)) {
                     cmds.entity(from).remove::<MovingSlider>();
+                }
+            }
+            NavEvent::Locked(from) => {
+                if let Ok(MainMenuElem::Credits) = elems.get(*from).map(|t| t.2) {
+                    let mut style = credit_overlay.single_mut();
+                    style.display = Display::Flex;
                 }
             }
             NavEvent::NoChanges { from, request: NavRequest::Action } => {
@@ -143,17 +148,41 @@ fn update_menu(
     }
 }
 
-fn update_highlight(mut highlight: Query<(&mut Style, &mut Node, &MenuCursor)>) {
+fn leave_credits(
+    mut credit_overlay: Query<&mut Style, With<CreditOverlay>>,
+    mut nav_requests: EventWriter<NavRequest>,
+    gamepad: Res<Input<GamepadButton>>,
+    mouse: Res<Input<MouseButton>>,
+    keyboard: Res<Input<KeyCode>>,
+) {
+    if gamepad.get_just_pressed().len() != 0
+        || mouse.get_just_pressed().len() != 0
+        || keyboard.get_just_pressed().len() != 0
+    {
+        let mut style = credit_overlay.single_mut();
+        if style.display == Display::Flex {
+            style.display = Display::None;
+            nav_requests.send(NavRequest::Free)
+        }
+    }
+}
+
+fn update_highlight(
+    mut highlight: Query<(&mut Style, &mut Node, &mut MenuCursor), Without<Focused>>,
+    focused: Query<(&Node, &GlobalTransform), With<Focused>>,
+) {
     use Val::Px;
-    if let Ok((mut style, mut node, target)) = highlight.get_single_mut() {
+    let query = (highlight.get_single_mut(), focused.get_single());
+    if let (Ok((mut style, mut cursor_node, mut target)), Ok((node, transform))) = query {
+        target.set_target(node, transform);
         if let (Px(left), Px(bot), Px(width), Px(height)) = (
             style.position.left,
             style.position.bottom,
             style.size.width,
             style.size.height,
         ) {
-            let size = node.size;
-            node.size += (target.size - size) * 0.4;
+            let size = cursor_node.size;
+            cursor_node.size += (target.size - size) * 0.4;
             style.size.width += (target.size.x - width) * 0.4;
             style.size.height += (target.size.y - height) * 0.4;
             style.position.left += (target.position.x - left) * 0.4;
@@ -242,7 +271,7 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>) {
             node{ flex_direction: FD::Row }[; Name::new("Menu columns")](
                 node[; Name::new("Menu node")](
                     node[large_text("Start");   focusable, Name::new("Start button"), Start],
-                    node[large_text("Credits"); focusable, Name::new("Credits button"), Credits],
+                    node[large_text("Credits"); Focusable::lock(), Name::new("Credits button"), Credits],
                     node[large_text("Exit");    focusable, Name::new("Exit button"), Exit]
                 ),
                 node{ align_items: AlignItems::FlexEnd, margin: rect!(50 px) }[; Name::new("Audio settings")](
@@ -255,6 +284,19 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>) {
                     node[large_text("Toggle Full screen"); focusable, ToggleFullScreen],
                     node[large_text("Make exactly 16:9"); focusable, Set16_9]
                 )
+            ),
+            node{
+                position_type: PT::Absolute,
+                position: rect!(10 pct),
+                display: Display::None,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center
+            }[; UiColor(Color::rgb(0.1, 0.1, 0.1)), Name::new("Credits overlay"), CreditOverlay](
+                node[large_text("Lorithan, Vasukas,");],
+                node[large_text("Gibonus, BLucky,");],
+                node[large_text("Xolotl, jpet,");],
+                node[large_text("Samuel_sound");],
+                node[text_bundle("(Click anywhere to exit)", 30.0);]
             )
         )
     };
@@ -271,6 +313,7 @@ impl BevyPlugin for Plugin {
             .add_system(nav::default_gamepad_input)
             .add_system(update_highlight)
             .add_system(update_sliders)
+            .add_system(leave_credits)
             .add_system(update_menu);
     }
 }
