@@ -1,56 +1,3 @@
-# Magic soccer
-
-## Pitch
-
-You are a team of apprentice wizards who more or less by accident got into
-the big league tournament of the zorrard game. (probably due to a upset such
-as a mysterious new disease disabling most teams)
-
-Zorrard is a team game of 5v5. There is a ball, each team must defend their
-gate, and you must shoot the ball in the opponent's team gate! (sound
-familiar eh?) You are only allowed to use your feet, and magic spells.
-
-The difference between the small league and big league players is that the
-big league wizards are very high level and use spells like "summon large demo",
-"blizzard" or "night of the walking deads". Your team's wizard only know
-the basic magic 101 spells such as "fireball", "invisibility", "illusion".
-
-Can you overcome this unfair advantage?
-
-## Gameplay
-
-Mostly AI driven. Player controls movement of single character in a single
-team and can swap control freely between characters in his team.
-
-Each character has two spell slots. The available spells may vary between
-characters. The cooldown on spell is per character.
-
-There is a "team spell" (like an ultimate move) that requires that certain
-conditions are met to use.
-
-There is a key mapped to (a) shooting the ball (b) using spell 1 (c) using
-spell 2 (d) using the "team spell".
-
-Left stick (or WASD) is mapped to movement of the controlled character, right
-stick (or mouse pointer) is mapped to "_auxiliary_ controlled character". An
-_auxiliary_ character is selected when hovered with mouse cursor or pointed
-at by the right stick (relative to controlled character).
-
-Pressing (a) when no _auxiliary_ is selected will simply shoot the ball in
-the direction the controlled character is facing. Pressing (a) when an
-_auxiliary_ is selected will perform a pass and swap player control to the
-_auxiliary_. Pressing (a) when controlled character doesn't have the ball
-will do the player control change without passing.
-
-Pressing (b,c) with no _auxiliary_ will activate the spell for the controlled
-wizard. Pressing (b,c) when _auxiliary_ is selected will trigger the
-_auxiliary_'s spell.
-
-The trick to for the player to win is to notice that the spells used by the
-strong wizards may look intimidating but are not as useful if you know your
-way around them.
-
-
 # Wizard's Battle
 
 Game has a premise similar to Battle (the card game, War in the US, but we
@@ -94,3 +41,62 @@ invisible or duplicating or swapping with enemy hand or picking from enemy
 deck). The magic tricks can be spotted by the blindfolded man while the
 physical tricks by the pigeon. You have to somehow get them to be distracted
 to pull the tricks.
+
+### Basic card game mechanic
+
+* Each turn, the initiative is swapped between oppo and player
+* At beginning of the game, player choses who has initiative.
+* If hand empty, draw 3 cards from draw pile
+* Turn:
+    * When you have the initiative, you play one card
+    * participant without initiative play their card
+    * Greatest value card wins (exception: see extra rules)
+    * Winner gets to add the cards to their win pile
+* Ends when draw pile is empty
+
+### Advanced card game mechanics
+
+The card suit is based on the French suite, colors are replaced with:
+* Tentacle
+* Pentacle
+* Miracle
+* Oracle
+
+The card numbers are swapped with [Maya numerals](https://en.wikipedia.org/wiki/Maya_numerals),
+from 0 to 12. Higher value cards win over lower value cards, except 0 which beats 12
+(but beaten by everything else).
+
+Each card has an enochian word of magic attached to it. There is exactly 10
+words of magic (see [wikipedia](https://en.wikipedia.org/wiki/Enochian)). Words
+of magic act like special modifiers on the card or can give bonus actions to player.
+
+TODO: design word of magic effects.
+
+### Distraction mechanics
+
+Sometimes the bird or the man are distracted. The bird often, the man rarely.
+
+You can use seeds or maybe interact with objects on the table to distract the bird
+and open a window of opportunity to do some cheats.
+
+There is an explicit UI elements giving the player an idea how long oppo is
+distracted. Each cheat has a different length of time. If you are spotted cheating,
+it's game over, no appeal.
+
+TODO: magic cheat mechanic
+
+### Cheats
+
+"physical" cheats are noticed by the bird, while "magic" cheats are noticed by
+the man. "free" cheats are noticed by no one.
+
+* Put card in sleeve (physical): When drawing next 3 cards, draw a fourth you put in your sleeve,
+  you may retrieve it next draw by clicking your sleeve while retrieving the cards
+* Swap card (physical): Very discretely swap one of the card in your hand with that of the oppo. (remember the man is blindfolded)
+* Peek (physical): look at top of draw pile, can chose to swap cards in your hand with it.
+* Hack platonic ordering (magic): Until next draw, lower value cards win.
+* Pull out seeds (free): Get the bird distracted by giving them seeds
+* Inner eye (magic): See the oppo's hand
+* Look over shoulder (physical): See the oppo's hand, requires extreme distraction from the bird
+* Déjà vu (magic): swap initative for this turn
+
