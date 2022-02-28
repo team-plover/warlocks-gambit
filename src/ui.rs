@@ -5,7 +5,10 @@ use bevy_ui_navigation::{
     systems as nav, Focusable, Focused, NavEvent, NavRequest, NavigationPlugin,
 };
 
-use crate::audio::{AudioChannel, AudioRequest, SfxParam};
+use crate::{
+    audio::{AudioChannel, AudioRequest, SfxParam},
+    state::GameState,
+};
 
 #[derive(Clone, Component, Default)]
 struct MenuCursor {
@@ -24,6 +27,10 @@ struct MovingSlider;
 
 #[derive(Component, Clone)]
 struct CreditOverlay;
+
+/// The root node of the main menu, to remove the menu when exiting it
+#[derive(Component, Clone)]
+struct MenuRoot;
 
 #[derive(Component, Clone, PartialEq)]
 enum MainMenuElem {
@@ -95,6 +102,7 @@ fn update_menu(
     mut audio_requests: EventWriter<AudioRequest>,
     mut windows: ResMut<Windows>,
     mut credit_overlay: Query<&mut Style, With<CreditOverlay>>,
+    mut game_state: ResMut<State<GameState>>,
     elems: Query<(&Node, &GlobalTransform, &MainMenuElem)>,
 ) {
     let window_msg = "There is at least one game window open";
@@ -118,6 +126,7 @@ fn update_menu(
                     Ok(MainMenuElem::Exit) => exit.send(AppExit),
                     Ok(MainMenuElem::Start) => {
                         audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
+                        game_state.set(GameState::Playing).unwrap();
                     }
                     Ok(MainMenuElem::LockMouse) => {
                         let window = windows.get_primary_mut().expect(window_msg);
@@ -257,7 +266,7 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>) {
     cmds.spawn_bundle(UiCameraBundle::default());
     build_ui! {
         #[cmd(cmds)]
-        node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node")](
+        node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
             node{ position_type: PT::Absolute }[;
                 UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
                 MenuCursor::default(),
@@ -302,18 +311,26 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>) {
     };
 }
 
-pub struct Plugin;
+fn exit_menu(mut cmds: Commands, root: Query<Entity, With<MenuRoot>>) {
+    cmds.entity(root.single()).despawn_recursive();
+}
+
+pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(NavigationPlugin)
             .init_resource::<MenuAssets>()
             .init_resource::<nav::InputMapping>()
-            .add_startup_system(setup_main_menu)
-            .add_system(nav::default_mouse_input)
-            .add_system(nav::default_gamepad_input)
-            .add_system(update_highlight)
-            .add_system(update_sliders)
-            .add_system(leave_credits)
-            .add_system(update_menu);
+            .add_system_set(SystemSet::on_enter(self.0).with_system(setup_main_menu))
+            .add_system_set(SystemSet::on_exit(self.0).with_system(exit_menu))
+            .add_system_set(
+                SystemSet::on_update(self.0)
+                    .with_system(nav::default_mouse_input)
+                    .with_system(nav::default_gamepad_input)
+                    .with_system(update_highlight)
+                    .with_system(update_sliders)
+                    .with_system(leave_credits)
+                    .with_system(update_menu),
+            );
     }
 }
