@@ -18,6 +18,8 @@ bevy-ui-build-macros = "0.2.1"
 bevy-inspector-egui = { version = "0.8", optional = true }
 enum-map = "2"
 
+bevy_mod_raycast = "0.3"
+
 [profile.dev.package."*"]
 opt-level = 1
 

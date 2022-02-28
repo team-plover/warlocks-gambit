@@ -550,6 +550,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_mod_raycast"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c39bc6b420c44db8ce8ed6439f7af96b04a6e131beaa106364310091ad2f332"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
 name = "bevy_pbr"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1807,6 +1816,7 @@ dependencies = [
  "bevy-ui-build-macros",
  "bevy-ui-navigation",
  "bevy_kira_audio",
+ "bevy_mod_raycast",
  "enum-map",
 ]
 
