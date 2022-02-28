@@ -5,7 +5,7 @@ use bevy_mod_raycast::{DefaultRaycastingPlugin, RayCastMesh, RayCastMethod, RayC
 
 use crate::{
     camera::PlayerCam,
-    card::{Card, SpawnCard, Value, WordOfMagic},
+    card::{Card, SpawnCard, Value, WordOfPower},
     state::GameState,
 };
 
@@ -49,7 +49,7 @@ fn spawn_hand(
         .id();
     for (i, value) in [Zero, Two, Seven, Eight].iter().enumerate() {
         card_spawner
-            .spawn_card(Card::new(WordOfMagic::Meb, *value))
+            .spawn_card(Card::new(WordOfPower::Meb, *value))
             .insert_bundle((
                 HandCard::new(i),
                 Parent(hand),

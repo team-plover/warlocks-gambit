@@ -15,7 +15,7 @@ use enum_map::{enum_map, Enum, EnumMap};
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Enum, Clone, Copy, Debug)]
-pub enum WordOfMagic {
+pub enum WordOfPower {
     Egeq,
     Geh,
     Het,
@@ -42,11 +42,11 @@ pub enum Value {
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component, Debug)]
 pub struct Card {
-    word: WordOfMagic,
+    word: WordOfPower,
     value: Value,
 }
 impl Card {
-    pub fn new(word: WordOfMagic, value: Value) -> Self {
+    pub fn new(word: WordOfPower, value: Value) -> Self {
         Self { word, value }
     }
 }
@@ -145,7 +145,7 @@ pub struct CardAssets {
     backface: Handle<StandardMaterial>,
     frontface: Handle<StandardMaterial>,
     quad: Handle<Mesh>,
-    words: EnumMap<WordOfMagic, Handle<StandardMaterial>>,
+    words: EnumMap<WordOfPower, Handle<StandardMaterial>>,
 }
 impl FromWorld for CardAssets {
     fn from_world(world: &mut World) -> Self {
@@ -195,7 +195,7 @@ impl BevyPlugin for Plugin {
         #[cfg(feature = "debug")]
         app.register_inspectable::<Card>()
             .register_inspectable::<Value>()
-            .register_inspectable::<WordOfMagic>();
+            .register_inspectable::<WordOfPower>();
 
         app.init_resource::<CardAssets>().add_system(update_card);
     }
