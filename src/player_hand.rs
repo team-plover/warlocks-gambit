@@ -49,7 +49,7 @@ fn spawn_hand(
         .id();
     for (i, value) in [Zero, Two, Seven, Eight].iter().enumerate() {
         card_spawner
-            .spawn_card(Card::new(WordOfMagic::Wealth, *value))
+            .spawn_card(Card::new(WordOfMagic::Meb, *value))
             .insert_bundle((
                 HandCard::new(i),
                 Parent(hand),

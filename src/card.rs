@@ -16,7 +16,12 @@ use enum_map::{enum_map, Enum, EnumMap};
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Enum, Clone, Copy, Debug)]
 pub enum WordOfMagic {
-    Wealth,
+    Egeq,
+    Geh,
+    Het,
+    Meb,
+    Qube,
+    Zihbm,
 }
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
@@ -32,9 +37,6 @@ pub enum Value {
     Seven,
     Eight,
     Nine,
-    Ten,
-    Eleven,
-    Twelve,
 }
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
@@ -55,6 +57,8 @@ struct CardFace;
 struct CardBack;
 #[derive(Component)]
 struct CardWord;
+#[derive(Component)]
+struct CardValue;
 
 #[rustfmt::skip]
 const CARD_VERTICES: [[f32; 2]; 12] = [
@@ -85,25 +89,34 @@ impl<'w, 's> SpawnCard<'w, 's> {
             .insert_bundle((card, Name::new("Card")))
             .with_children(|cmds| {
                 cmds.spawn_bundle(PbrBundle {
-                    mesh: self.assets.word_mesh.clone(),
+                    mesh: self.assets.quad.clone(),
                     material: self.assets.words[word].clone(),
-                    transform: Transform::from_xyz(0.0, 0.0, 0.01),
+                    transform: Transform::from_xyz(0.0, -0.8, 0.01)
+                        .with_scale(Vec3::new(1.5, 1.0, 1.0)),
                     ..Default::default()
                 })
-                .insert(CardWord);
+                .insert_bundle((CardWord, Name::new("Word")));
+                cmds.spawn_bundle(PbrBundle {
+                    mesh: self.assets.quad.clone(),
+                    material: self.assets.values[value].clone(),
+                    transform: Transform::from_xyz(0.0, 0.5, 0.01)
+                        .with_scale(Vec3::new(1.0, 1.5, 1.0)),
+                    ..Default::default()
+                })
+                .insert_bundle((CardValue, Name::new("Value")));
                 cmds.spawn_bundle(PbrBundle {
                     mesh: self.assets.card.clone(),
-                    material: self.assets.values[value].clone(),
+                    material: self.assets.frontface.clone(),
                     ..Default::default()
                 })
-                .insert(CardFace);
+                .insert_bundle((CardFace, Name::new("Front face")));
                 cmds.spawn_bundle(PbrBundle {
                     mesh: self.assets.card.clone(),
                     material: self.assets.backface.clone(),
                     transform: Transform::from_rotation(Quat::from_rotation_y(PI)),
                     ..Default::default()
                 })
-                .insert(CardBack);
+                .insert_bundle((CardBack, Name::new("Back face")));
             });
         entity
     }
@@ -111,7 +124,7 @@ impl<'w, 's> SpawnCard<'w, 's> {
 fn update_card(
     cards: Query<(&Card, &Children), Changed<Card>>,
     assets: Res<CardAssets>,
-    mut face_mats: Query<&mut Handle<StandardMaterial>, (Without<CardWord>, With<CardFace>)>,
+    mut face_mats: Query<&mut Handle<StandardMaterial>, (Without<CardWord>, With<CardValue>)>,
     mut word_mats: Query<&mut Handle<StandardMaterial>, With<CardWord>>,
 ) {
     for (card, children) in cards.iter() {
@@ -130,7 +143,8 @@ pub struct CardAssets {
     card: Handle<Mesh>,
     values: EnumMap<Value, Handle<StandardMaterial>>,
     backface: Handle<StandardMaterial>,
-    word_mesh: Handle<Mesh>,
+    frontface: Handle<StandardMaterial>,
+    quad: Handle<Mesh>,
     words: EnumMap<WordOfMagic, Handle<StandardMaterial>>,
 }
 impl FromWorld for CardAssets {
@@ -162,13 +176,14 @@ impl FromWorld for CardAssets {
         let mut meshes = world.get_resource_mut::<Assets<Mesh>>().unwrap();
         Self {
             card: meshes.add(card_mesh),
-            word_mesh: meshes.add(shape::Quad::new(Vec2::splat(2.0)).into()),
-            backface: add_texture_material!("cards/Backface.jpg"),
+            quad: meshes.add(shape::Quad::new(Vec2::splat(1.0)).into()),
+            backface: add_texture_material!("cards/BackFace.PNG"),
+            frontface: add_texture_material!("cards/FrontFace.PNG"),
             values: enum_map! {
-                value => add_texture_material!(&format!("cards/Value{value:?}.jpg")),
+                value => add_texture_material!(&format!("cards/Value{value:?}.PNG"), alpha: 0.5),
             },
             words: enum_map! {
-                word => add_texture_material!(&format!("cards/Word{word:?}.png"), alpha: 0.5),
+                word => add_texture_material!(&format!("cards/Word{word:?}.PNG"), alpha: 0.5),
             },
         }
     }
