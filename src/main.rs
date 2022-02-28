@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use heron::prelude::*;
 
 mod audio;
 mod ui;
@@ -13,7 +12,6 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
-        .add_plugin(PhysicsPlugin::default())
         .add_plugin(audio::Plugin)
         .add_plugin(ui::Plugin);
 
