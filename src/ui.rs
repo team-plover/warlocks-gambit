@@ -5,7 +5,10 @@ use bevy_ui_navigation::{
     systems as nav, Focusable, Focused, NavEvent, NavRequest, NavigationPlugin,
 };
 
-use crate::audio::{AudioChannel, AudioRequest, SfxParam};
+use crate::{
+    add_dbg_text,
+    audio::{AudioChannel, AudioRequest, SfxParam},
+};
 
 #[derive(Clone, Component, Default)]
 struct MenuCursor {
@@ -117,6 +120,7 @@ fn update_menu(
                 match elems.get(*from.first()).map(|t| t.2) {
                     Ok(MainMenuElem::Exit) => exit.send(AppExit),
                     Ok(MainMenuElem::Start) => {
+                        add_dbg_text!("Player pressed the start button");
                         audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
                     }
                     Ok(MainMenuElem::LockMouse) => {
