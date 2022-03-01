@@ -7,7 +7,7 @@ edition = "2021"
 
 [features]
 dynamic = ["bevy/dynamic"]
-debug = ["bevy-inspector-egui"]
+debug = ["bevy-inspector-egui", "lazy_static", "dashmap"]
 default = ["dynamic", "debug"]
 
 [dependencies]
@@ -17,8 +17,8 @@ bevy = { version = "0.6", default-features = false, features = ["bevy_gilrs", "b
 bevy-ui-build-macros = "0.2.1"
 bevy-inspector-egui = { version = "0.8", optional = true }
 
-dashmap = "4.0"
-lazy_static = "1.4"
+dashmap = { version = "4.0", optional = true }
+lazy_static = { version = "1.4", optional = true }
 
 [profile.dev.package."*"]
 opt-level = 1
