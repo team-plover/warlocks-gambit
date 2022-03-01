@@ -1,8 +1,10 @@
 use bevy::prelude::*;
 
 mod audio;
-mod debug_overlay;
 mod ui;
+
+#[cfg(debug_assertions)] //only include if compiling in debug mode
+mod debug_overlay;
 
 fn main() {
     let mut app = App::new();
@@ -13,12 +15,12 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
-        .add_plugin(debug_overlay::Plugin)
         .add_plugin(audio::Plugin)
         .add_plugin(ui::Plugin);
 
     #[cfg(feature = "debug")]
-    app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new());
+    app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new())
+        .add_plugin(debug_overlay::Plugin);
 
     app.run();
 }
