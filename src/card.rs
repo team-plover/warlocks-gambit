@@ -1,6 +1,7 @@
-use std::f32::consts::PI;
+use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::ecs::system::{EntityCommands, SystemParam};
+use bevy::math::EulerRot::XYZ;
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy::render::{
     mesh::{
@@ -12,6 +13,8 @@ use bevy::render::{
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use enum_map::{enum_map, Enum, EnumMap};
+
+use crate::card_spawner::PlayerCardSpawner;
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Enum, Clone, Copy, Debug)]
@@ -80,45 +83,53 @@ const CARD_EDGES: [u16; 30] = [
 pub struct SpawnCard<'w, 's> {
     cmds: Commands<'w, 's>,
     assets: Res<'w, CardAssets>,
+    player_deck: Query<'w, 's, &'static GlobalTransform, With<PlayerCardSpawner>>,
 }
 impl<'w, 's> SpawnCard<'w, 's> {
     pub fn spawn_card<'a>(&'a mut self, card: Card) -> EntityCommands<'w, 's, 'a> {
         let Card { value, word } = card;
-        let mut entity = self.cmds.spawn();
-        entity
-            .insert_bundle((card, Name::new("Card")))
-            .with_children(|cmds| {
-                cmds.spawn_bundle(PbrBundle {
-                    mesh: self.assets.quad.clone(),
-                    material: self.assets.words[word].clone(),
-                    transform: Transform::from_xyz(0.0, -0.8, 0.01)
-                        .with_scale(Vec3::new(1.5, 1.0, 1.0)),
-                    ..Default::default()
-                })
-                .insert_bundle((CardWord, Name::new("Word")));
-                cmds.spawn_bundle(PbrBundle {
-                    mesh: self.assets.quad.clone(),
-                    material: self.assets.values[value].clone(),
-                    transform: Transform::from_xyz(0.0, 0.5, 0.01)
-                        .with_scale(Vec3::new(1.0, 1.5, 1.0)),
-                    ..Default::default()
-                })
-                .insert_bundle((CardValue, Name::new("Value")));
-                cmds.spawn_bundle(PbrBundle {
-                    mesh: self.assets.card.clone(),
-                    material: self.assets.frontface.clone(),
-                    ..Default::default()
-                })
-                .insert_bundle((CardFace, Name::new("Front face")));
-                cmds.spawn_bundle(PbrBundle {
-                    mesh: self.assets.card.clone(),
-                    material: self.assets.backface.clone(),
-                    transform: Transform::from_rotation(Quat::from_rotation_y(PI)),
-                    ..Default::default()
-                })
-                .insert_bundle((CardBack, Name::new("Back face")));
-            });
-        entity
+        let spawner_transform = self.player_deck.single();
+        let mut card_entity = self.cmds.spawn_bundle((
+            card,
+            Name::new("Card"),
+            GlobalTransform::default(),
+            Transform {
+                scale: Vec3::splat(0.5),
+                translation: spawner_transform.translation,
+                rotation: spawner_transform.rotation * Quat::from_euler(XYZ, FRAC_PI_2, 0.0, 0.0),
+            },
+        ));
+        card_entity.with_children(|cmds| {
+            cmds.spawn_bundle(PbrBundle {
+                mesh: self.assets.quad.clone(),
+                material: self.assets.words[word].clone(),
+                transform: Transform::from_xyz(0.0, -0.8, 0.01)
+                    .with_scale(Vec3::new(1.5, 1.0, 1.0)),
+                ..Default::default()
+            })
+            .insert_bundle((CardWord, Name::new("Word")));
+            cmds.spawn_bundle(PbrBundle {
+                mesh: self.assets.quad.clone(),
+                material: self.assets.values[value].clone(),
+                transform: Transform::from_xyz(0.0, 0.5, 0.01).with_scale(Vec3::new(1.0, 1.5, 1.0)),
+                ..Default::default()
+            })
+            .insert_bundle((CardValue, Name::new("Value")));
+            cmds.spawn_bundle(PbrBundle {
+                mesh: self.assets.card.clone(),
+                material: self.assets.frontface.clone(),
+                ..Default::default()
+            })
+            .insert_bundle((CardFace, Name::new("Front face")));
+            cmds.spawn_bundle(PbrBundle {
+                mesh: self.assets.card.clone(),
+                material: self.assets.backface.clone(),
+                transform: Transform::from_rotation(Quat::from_rotation_y(PI)),
+                ..Default::default()
+            })
+            .insert_bundle((CardBack, Name::new("Back face")));
+        });
+        card_entity
     }
 }
 fn update_card(

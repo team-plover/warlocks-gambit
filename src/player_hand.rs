@@ -38,23 +38,18 @@ fn spawn_hand(
     let cam = cam.single();
     cmds.entity(cam).insert(RayCastSource::<HandRaycast>::new());
 
-    let hand = cmds
-        .spawn_bundle((
-            GlobalTransform::default(),
-            Transform::from_xyz(0.0, -3.6, -10.0),
-            Name::new("Player hand"),
-            Hand,
-            Parent(cam),
-        ))
-        .id();
+    cmds.spawn_bundle((
+        GlobalTransform::default(),
+        Transform::from_xyz(0.0, -0.2, -5.0),
+        Name::new("Player hand"),
+        Hand,
+        Parent(cam),
+    ));
     for (i, value) in [Zero, Two, Seven, Eight].iter().enumerate() {
         card_spawner
             .spawn_card(Card::new(WordOfPower::Meb, *value))
             .insert_bundle((
                 HandCard::new(i),
-                Parent(hand),
-                GlobalTransform::default(),
-                Transform::default(),
                 RayCastMesh::<HandRaycast>::default(),
                 meshes.add(shape::Quad::new(Vec2::new(2.3, 3.3)).into()),
                 Visibility::default(),
@@ -84,6 +79,7 @@ fn update_raycast(
         }
     }
 }
+/// Set the [`HoveredCard`] as the last one on which the cursor hovered.
 fn select_card(
     mut cmds: Commands,
     mut cursor: EventReader<CursorMoved>,
@@ -103,15 +99,26 @@ fn select_card(
     }
 }
 
-fn update_hand(mut hand: Query<(&mut Transform, &HandCard, Option<&HoveredCard>)>) {
-    for (mut transform, HandCard { index }, hover) in hand.iter_mut() {
+/// Move progressively cards from [`HandCard`] in front of player camera.
+fn update_hand(
+    hand: Query<&GlobalTransform, With<Hand>>,
+    mut cards: Query<(&mut Transform, &HandCard, Option<&HoveredCard>)>,
+) {
+    const CARD_SPEED: f32 = 0.15;
+    let hand_transform = hand.single();
+    let hand_pos = hand_transform.translation;
+    for (mut transform, HandCard { index }, hover) in cards.iter_mut() {
         let i_f32 = *index as f32;
-        let vertical_offset = if hover.is_some() { 2.0 } else { 0.0 };
-        let z_offset = if hover.is_some() { 0.1 } else { i_f32 * -0.1 };
-        // TODO: full transform lerp
-        let target = Vec3::new(i_f32 * 1.7 - 2.0, vertical_offset, z_offset);
+        let vertical_offset = if hover.is_some() { -0.2 } else { -1.2 };
+        let horizontal_offset = i_f32 - 1.0;
+        let z_offset = if hover.is_some() { 0.01 } else { i_f32 * -0.01 };
+        let target = hand_pos + Vec3::new(horizontal_offset, vertical_offset, z_offset);
         let origin = transform.translation;
-        transform.translation += (target - origin) * 0.2;
+        transform.translation += (target - origin) * CARD_SPEED;
+
+        let target = hand_transform.rotation;
+        let origin = transform.rotation;
+        transform.rotation = origin.lerp(target, CARD_SPEED);
     }
 }
 

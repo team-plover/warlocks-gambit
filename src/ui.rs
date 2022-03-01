@@ -126,7 +126,7 @@ fn update_menu(
                     Ok(MainMenuElem::Exit) => exit.send(AppExit),
                     Ok(MainMenuElem::Start) => {
                         audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
-                        game_state.set(GameState::Playing).unwrap();
+                        game_state.set(GameState::LoadScene).unwrap();
                     }
                     Ok(MainMenuElem::LockMouse) => {
                         let window = windows.get_primary_mut().expect(window_msg);
