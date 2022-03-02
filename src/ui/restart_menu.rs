@@ -57,16 +57,13 @@ fn update(
     buttons: Query<&Button>,
 ) {
     for event in nav_events.iter() {
-        match event {
-            NavEvent::NoChanges { from, request: NavRequest::Action } => {
-                match buttons.get(*from.first()) {
-                    Ok(Button::Restart) => state.set(GameState::Playing).unwrap(),
-                    Ok(Button::MainMenu) => state.set(GameState::MainMenu).unwrap(),
-                    Ok(Button::ExitApp) => app_exit.send(AppExit),
-                    _ => (),
-                }
+        if let NavEvent::NoChanges { from, request: NavRequest::Action } = event {
+            match buttons.get(*from.first()) {
+                Ok(Button::Restart) => state.set(GameState::Playing).unwrap(),
+                Ok(Button::MainMenu) => state.set(GameState::MainMenu).unwrap(),
+                Ok(Button::ExitApp) => app_exit.send(AppExit),
+                _ => (),
             }
-            _ => (),
         }
     }
 }
