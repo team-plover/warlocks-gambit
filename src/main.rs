@@ -3,6 +3,7 @@ use bevy::prelude::*;
 mod audio;
 mod card;
 mod card_effect;
+mod game_ui;
 mod gltf_hook;
 mod oppo_hand;
 mod pile;
@@ -10,6 +11,7 @@ mod player_hand;
 mod scene;
 mod state;
 mod ui;
+mod war;
 
 mod camera {
     use bevy::prelude::Component;
@@ -43,7 +45,7 @@ pub enum Participant {
     Oppo,
 }
 
-use state::GameState;
+use state::{GameState, TurnState};
 
 fn main() {
     let mut app = App::new();
@@ -55,6 +57,7 @@ fn main() {
             ..Default::default()
         })
         .add_state(GameState::MainMenu)
+        .add_state(TurnState::None)
         .add_plugins(DefaultPlugins);
 
     #[cfg(feature = "debug")]
@@ -71,11 +74,17 @@ fn main() {
         .add_plugin(ui::restart_menu::Plugin)
         .add_plugin(pile::Plugin(GameState::Playing))
         .add_plugin(card_effect::Plugin(GameState::Playing))
-        .add_system(setup);
+        .add_plugin(game_ui::Plugin(GameState::Playing))
+        .add_system(setup)
+        .add_system_set(SystemSet::on_enter(GameState::Playing).with_system(enter_game));
 
     app.run();
 }
 
 fn setup(mut ambiant_light: ResMut<AmbientLight>) {
     *ambiant_light = AmbientLight { color: Color::WHITE, brightness: 1.0 };
+}
+
+fn enter_game(mut turn_state: ResMut<State<TurnState>>) {
+    turn_state.set(TurnState::Player).unwrap();
 }

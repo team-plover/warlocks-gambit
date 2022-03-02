@@ -3,9 +3,12 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
 use crate::{
-    card::{Card, SpawnCard, Value, WordOfPower},
+    card::{Card, CardStatus, SpawnCard, WordOfPower},
+    card_effect::ActivateCard,
     card_spawner::OppoHand,
-    state::GameState,
+    // pile::{Pile, PileCard, PileType},
+    state::{GameState, TurnState},
+    war::Value,
     Participant,
 };
 
@@ -49,12 +52,31 @@ fn update_oppo_hand(
     }
 }
 
+fn chose_card(
+    mut cmds: Commands,
+    mut card_events: EventWriter<ActivateCard>,
+    mut cards: Query<(Entity, &mut Card), With<OppoCard>>,
+    // pile_cards: Query<&PileCard>,
+    // pile: Query<&Pile>,
+) {
+    // use PileType::War;
+    // let pile = pile.iter().find(|p| p.which == War).expect("War pile exists");
+    // TODO: use an actual heuristic instead of picking first at all time
+    if let Some((selected, mut card)) = cards.iter_mut().next() {
+        // TODO: migrate setting that status to card_effect::handle_activated
+        card.set_status(CardStatus::Activated);
+        cmds.entity(selected).remove::<OppoCard>();
+        card_events.send(ActivateCard::new(selected, Participant::Oppo));
+    }
+}
+
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         #[cfg(feature = "debug")]
         app.register_inspectable::<OppoCard>();
         app.add_system_set(SystemSet::on_enter(self.0).with_system(spawn_hand))
+            .add_system_set(SystemSet::on_enter(TurnState::Oppo).with_system(chose_card))
             .add_system_set(SystemSet::on_update(self.0).with_system(update_oppo_hand));
     }
 }

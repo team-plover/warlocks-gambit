@@ -16,6 +16,7 @@ use enum_map::{enum_map, Enum, EnumMap};
 
 use crate::{
     card_spawner::{OppoCardSpawner, PlayerCardSpawner},
+    war::Value,
     Participant,
 };
 
@@ -41,21 +42,6 @@ impl WordOfPower {
             Zihbm => Color::PINK,
         }
     }
-}
-
-#[cfg_attr(feature = "debug", derive(Inspectable))]
-#[derive(Enum, Debug, Clone, Copy)]
-pub enum Value {
-    Zero,
-    One,
-    Two,
-    Three,
-    Four,
-    Five,
-    Six,
-    Seven,
-    Eight,
-    Nine,
 }
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]

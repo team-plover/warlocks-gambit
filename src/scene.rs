@@ -7,7 +7,7 @@ use crate::{
     camera::PlayerCam,
     card_spawner::{OppoCardSpawner, OppoHand, PlayerCardSpawner, PlayerHand},
     gltf_hook::{GltfHook, GltfInstance},
-    pile::Pile,
+    pile::{Pile, PileType},
     state::GameState,
 };
 
@@ -20,7 +20,9 @@ impl GltfHook for Scene {
             "OppoCardSpawn" => cmds.insert(OppoCardSpawner),
             "OppoHand" => cmds.insert(OppoHand),
             "PlayerHand" => cmds.insert(PlayerHand),
-            "Pile" => cmds.insert(Pile::default()),
+            "Pile" => cmds.insert(Pile::new(PileType::War)),
+            "OppoPile" => cmds.insert(Pile::new(PileType::Oppo)),
+            "PlayerPile" => cmds.insert(Pile::new(PileType::Player)),
             _ => cmds,
         };
     }

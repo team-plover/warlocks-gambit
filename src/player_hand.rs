@@ -5,10 +5,11 @@ use bevy_mod_raycast::{DefaultRaycastingPlugin, RayCastMesh, RayCastMethod, RayC
 
 use crate::{
     camera::PlayerCam,
-    card::{Card, CardStatus, SpawnCard, Value, WordOfPower},
+    card::{Card, CardStatus, SpawnCard, WordOfPower},
     card_effect::ActivateCard,
     card_spawner::PlayerHand,
-    state::GameState,
+    state::{GameState, TurnState},
+    war::Value,
     Participant,
 };
 
@@ -115,9 +116,10 @@ fn play_card(
             // TODO: Test where the card was released (if in sleeve, then sleeve cheat
             // else if far from hand then activate else return to hand)
             Dragging if mouse.just_released(MouseButton::Left) => {
+                // TODO: migrate setting that status to card_effect::handle_activated
                 card.set_status(CardStatus::Activated);
                 cmds.entity(entity).remove::<HandCard>();
-                card_events.send(ActivateCard(entity));
+                card_events.send(ActivateCard::new(entity, Participant::Player));
                 break;
             }
             Dragging => {
@@ -163,11 +165,11 @@ impl BevyPlugin for Plugin {
         app.add_plugin(DefaultRaycastingPlugin::<HandRaycast>::default())
             .add_system_set(SystemSet::on_enter(self.0).with_system(spawn_hand))
             .add_system_set(
-                SystemSet::on_update(self.0)
+                SystemSet::on_update(TurnState::Player)
                     .with_system(select_card.label("select"))
                     .with_system(play_card.label("play").after("select"))
-                    .with_system(update_hand.after("play"))
                     .with_system(update_raycast),
-            );
+            )
+            .add_system_set(SystemSet::on_update(self.0).with_system(update_hand.after("play")));
     }
 }
