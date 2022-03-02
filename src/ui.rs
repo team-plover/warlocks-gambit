@@ -43,11 +43,11 @@ enum MainMenuElem {
     AudioSlider(AudioChannel, f32),
 }
 
-struct MenuAssets {
+pub struct MenuAssets {
     title_image: Handle<Image>,
     slider_handle: Handle<Image>,
     slider_bg: Handle<Image>,
-    font: Handle<Font>,
+    pub font: Handle<Font>,
 }
 impl FromWorld for MenuAssets {
     fn from_world(world: &mut World) -> Self {

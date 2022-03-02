@@ -3,7 +3,9 @@ use bevy::prelude::*;
 mod audio;
 mod camera;
 mod card;
+mod gameover;
 mod player_hand;
+mod restart_menu;
 mod state;
 mod ui;
 
@@ -29,6 +31,8 @@ fn main() {
         .add_plugin(audio::Plugin)
         .add_plugin(card::Plugin)
         .add_plugin(ui::Plugin(GameState::MainMenu))
+        .add_plugin(gameover::Plugin)
+        .add_plugin(restart_menu::Plugin)
         .add_system(setup);
 
     app.run();
