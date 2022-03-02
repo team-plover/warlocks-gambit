@@ -1,26 +1,14 @@
+use super::common::*;
 use bevy::prelude::{Plugin as BevyPlugin, *};
-use bevy::{app::AppExit, input::mouse::MouseMotion, math::Vec3Swizzles, window::WindowMode};
+use bevy::{app::AppExit, input::mouse::MouseMotion, window::WindowMode};
 use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
-use bevy_ui_navigation::{
-    systems as nav, Focusable, Focused, NavEvent, NavRequest, NavigationPlugin,
-};
+use bevy_ui_navigation::{Focusable, Focused, NavEvent, NavRequest};
 
 use crate::{
     add_dbg_text,
     audio::{AudioChannel, AudioRequest, SfxParam},
+    state::GameState,
 };
-
-#[derive(Clone, Component, Default)]
-struct MenuCursor {
-    size: Vec2,
-    position: Vec2,
-}
-impl MenuCursor {
-    fn set_target(&mut self, node: &Node, transform: &GlobalTransform) {
-        self.size = node.size * 1.05;
-        self.position = transform.translation.xy() - self.size / 2.0;
-    }
-}
 
 #[derive(Component)]
 struct MovingSlider;
@@ -43,13 +31,11 @@ struct MenuAssets {
     title_image: Handle<Image>,
     slider_handle: Handle<Image>,
     slider_bg: Handle<Image>,
-    font: Handle<Font>,
 }
 impl FromWorld for MenuAssets {
     fn from_world(world: &mut World) -> Self {
         let assets = world.get_resource::<AssetServer>().unwrap();
         Self {
-            font: assets.load("Boogaloo-Regular.otf"),
             title_image: assets.load("title_image.png"),
             slider_bg: assets.load("slider_bg.png"),
             slider_handle: assets.load("slider_handle.png"),
@@ -98,6 +84,7 @@ fn update_menu(
     mut audio_requests: EventWriter<AudioRequest>,
     mut windows: ResMut<Windows>,
     mut credit_overlay: Query<&mut Style, With<CreditOverlay>>,
+    mut game_state: ResMut<State<GameState>>,
     elems: Query<(&Node, &GlobalTransform, &MainMenuElem)>,
 ) {
     let window_msg = "There is at least one game window open";
@@ -122,6 +109,7 @@ fn update_menu(
                     Ok(MainMenuElem::Start) => {
                         add_dbg_text!("Player pressed the start button");
                         audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
+                        game_state.set(GameState::LoadScene).unwrap();
                     }
                     Ok(MainMenuElem::LockMouse) => {
                         let window = windows.get_primary_mut().expect(window_msg);
@@ -132,7 +120,11 @@ fn update_menu(
                         use WindowMode::*;
                         let window = windows.get_primary_mut().expect(window_msg);
                         let prev_mode = window.mode();
-                        let new_mode = if prev_mode == Fullscreen { Windowed } else { Fullscreen };
+                        let new_mode = if prev_mode == BorderlessFullscreen {
+                            Windowed
+                        } else {
+                            BorderlessFullscreen
+                        };
                         window.set_mode(new_mode);
                     }
                     Ok(MainMenuElem::Set16_9) => {
@@ -171,48 +163,14 @@ fn leave_credits(
     }
 }
 
-fn update_highlight(
-    mut highlight: Query<(&mut Style, &mut Node, &mut MenuCursor), Without<Focused>>,
-    focused: Query<(&Node, &GlobalTransform), With<Focused>>,
-) {
-    use Val::Px;
-    let query = (highlight.get_single_mut(), focused.get_single());
-    if let (Ok((mut style, mut cursor_node, mut target)), Ok((node, transform))) = query {
-        target.set_target(node, transform);
-        if let (Px(left), Px(bot), Px(width), Px(height)) = (
-            style.position.left,
-            style.position.bottom,
-            style.size.width,
-            style.size.height,
-        ) {
-            let size = cursor_node.size;
-            cursor_node.size += (target.size - size) * 0.4;
-            style.size.width += (target.size.x - width) * 0.4;
-            style.size.height += (target.size.y - height) * 0.4;
-            style.position.left += (target.position.x - left) * 0.4;
-            style.position.bottom += (target.position.y - bot) * 0.4;
-        } else {
-            style.position = rect!(1 px);
-            style.size = size!(1 px, 1 px);
-        }
-    }
-}
-
 /// Spawns the UI tree
-fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>) {
+fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: Res<UiAssets>) {
     use FlexDirection as FD;
     use MainMenuElem::*;
     use PositionType as PT;
 
-    let text_bundle = |content: &str, font_size: f32| {
-        let color = Color::ANTIQUE_WHITE;
-        let horizontal = HorizontalAlign::Left;
-        let style = TextStyle { color, font: menu_assets.font.clone(), font_size };
-        let align = TextAlignment { horizontal, ..Default::default() };
-        let text = Text::with_section(content, style, align);
-        TextBundle { text, ..Default::default() }
-    };
-    let large_text = |content| text_bundle(content, 60.0);
+    let text_bundle = |content: &str, font_size: f32| ui_assets.text_bundle(content, font_size);
+    let large_text = |content| ui_assets.large_text(content);
     let focusable = Focusable::default();
     let image =
         |image: &Handle<Image>| ImageBundle { image: image.clone().into(), ..Default::default() };
@@ -258,10 +216,9 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>) {
     let master_slider = slider("Master", AudioChannel::Master, 100.0);
     let sfx_slider = slider("Sfx", AudioChannel::Sfx, 50.0);
     let music_slider = slider("Music", AudioChannel::Music, 50.0);
-    cmds.spawn_bundle(UiCameraBundle::default());
     build_ui! {
         #[cmd(cmds)]
-        node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node")](
+        node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
             node{ position_type: PT::Absolute }[;
                 UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
                 MenuCursor::default(),
@@ -296,7 +253,7 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>) {
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center
             }[; UiColor(Color::rgb(0.1, 0.1, 0.1)), Name::new("Credits overlay"), CreditOverlay](
-                node[large_text("Lorithan, Vasukas,");],
+                node[large_text("Lorithan, vasukas,");],
                 node[large_text("Gibonus, BLucky,");],
                 node[large_text("Xolotl, jpet,");],
                 node[large_text("Samuel_sound");],
@@ -306,18 +263,17 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>) {
     };
 }
 
-pub struct Plugin;
+pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(NavigationPlugin)
-            .init_resource::<MenuAssets>()
-            .init_resource::<nav::InputMapping>()
-            .add_startup_system(setup_main_menu)
-            .add_system(nav::default_mouse_input)
-            .add_system(nav::default_gamepad_input)
-            .add_system(update_highlight)
-            .add_system(update_sliders)
-            .add_system(leave_credits)
-            .add_system(update_menu);
+        app.init_resource::<MenuAssets>()
+            .add_system_set(SystemSet::on_enter(self.0).with_system(setup_main_menu))
+            .add_system_set(SystemSet::on_exit(self.0).with_system(exit_menu))
+            .add_system_set(
+                SystemSet::on_update(self.0)
+                    .with_system(update_sliders)
+                    .with_system(leave_credits)
+                    .with_system(update_menu),
+            );
     }
 }
