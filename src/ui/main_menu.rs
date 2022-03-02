@@ -118,7 +118,11 @@ fn update_menu(
                         use WindowMode::*;
                         let window = windows.get_primary_mut().expect(window_msg);
                         let prev_mode = window.mode();
-                        let new_mode = if prev_mode == Fullscreen { Windowed } else { Fullscreen };
+                        let new_mode = if prev_mode == BorderlessFullscreen {
+                            Windowed
+                        } else {
+                            BorderlessFullscreen
+                        };
                         window.set_mode(new_mode);
                     }
                     Ok(MainMenuElem::Set16_9) => {
