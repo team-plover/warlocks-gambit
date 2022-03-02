@@ -5,26 +5,33 @@ use bevy_mod_raycast::{DefaultRaycastingPlugin, RayCastMesh, RayCastMethod, RayC
 
 use crate::{
     camera::PlayerCam,
-    card::{Card, SpawnCard, Value, WordOfPower},
+    card::{Card, CardStatus, SpawnCard, Value, WordOfPower},
+    card_effect::ActivateCard,
+    card_spawner::PlayerHand,
     state::GameState,
+    Participant,
 };
 
 enum HandRaycast {}
 
-#[derive(Component)]
-struct Hand;
-
-#[derive(Component)]
-struct HoveredCard;
+#[cfg_attr(feature = "debug", derive(Inspectable))]
+#[derive(PartialEq)]
+enum HoverStatus {
+    Hovered,
+    Dragging,
+    None,
+}
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component)]
 struct HandCard {
     index: usize,
+    hover: HoverStatus,
 }
 impl HandCard {
     fn new(index: usize) -> Self {
-        Self { index }
+        let hover = HoverStatus::None;
+        Self { index, hover }
     }
 }
 
@@ -34,43 +41,19 @@ fn spawn_hand(
     mut meshes: ResMut<Assets<Mesh>>,
     cam: Query<Entity, With<PlayerCam>>,
 ) {
-    use Value::{Eight, Seven, Two, Zero};
-    let cam = cam.single();
-    cmds.entity(cam).insert(RayCastSource::<HandRaycast>::new());
-
-    let hand = cmds
-        .spawn_bundle((
-            GlobalTransform::default(),
-            Transform::from_xyz(0.0, -3.6, -10.0),
-            Name::new("Player hand"),
-            Hand,
-            Parent(cam),
-        ))
-        .id();
-    for (i, value) in [Zero, Two, Seven, Eight].iter().enumerate() {
+    use Value::{Seven, Two, Zero};
+    cmds.entity(cam.single())
+        .insert(RayCastSource::<HandRaycast>::new());
+    for (i, value) in [Zero, Two, Seven].iter().enumerate() {
         card_spawner
-            .spawn_card(Card::new(WordOfPower::Meb, *value))
+            .spawn_card(Card::new(WordOfPower::Geh, *value), Participant::Player)
             .insert_bundle((
                 HandCard::new(i),
-                Parent(hand),
-                GlobalTransform::default(),
-                Transform::default(),
                 RayCastMesh::<HandRaycast>::default(),
                 meshes.add(shape::Quad::new(Vec2::new(2.3, 3.3)).into()),
                 Visibility::default(),
                 ComputedVisibility::default(),
             ));
-    }
-}
-
-// Workaround the Hand (and children) GlobalTransform not being set correctly
-// when spawned
-fn update_hand_transform(
-    query: Query<Entity, Added<Hand>>,
-    mut cam: Query<&mut Transform, (Without<Hand>, With<PlayerCam>)>,
-) {
-    if query.get_single().is_ok() {
-        cam.single_mut().set_changed();
     }
 }
 
@@ -84,34 +67,91 @@ fn update_raycast(
         }
     }
 }
+
+// TODO: disable hover & dragging when it is not player's turn
+/// Set the [`HoveredCard`] as the last one on which the cursor hovered.
 fn select_card(
-    mut cmds: Commands,
     mut cursor: EventReader<CursorMoved>,
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
-    hovered: Query<Entity, With<HoveredCard>>,
+    mut hand_cards: Query<(Entity, &mut Card, &mut HandCard)>,
 ) {
+    use HoverStatus::{Dragging, Hovered};
     let query = hand_raycaster.get_single().map(|ray| ray.intersect_top());
     let has_cursor_moved = cursor.iter().next().is_some();
     if let Ok(Some((hovered_card, _))) = query {
-        // `hovered_card` is not the one that already exists
-        if hovered.get(hovered_card).is_err() && has_cursor_moved {
-            if let Ok(old_hovered) = hovered.get_single() {
-                cmds.entity(old_hovered).remove::<HoveredCard>();
+        if !has_cursor_moved {
+            return;
+        }
+        for (entity, mut card, mut hand_card) in hand_cards.iter_mut() {
+            if entity == hovered_card && hand_card.hover != Dragging {
+                card.set_status(CardStatus::Hovered);
+                hand_card.hover = Hovered;
+            } else if hand_card.hover != Dragging {
+                card.set_status(CardStatus::Normal);
+                hand_card.hover = HoverStatus::None;
             }
-            cmds.entity(hovered_card).insert(HoveredCard);
         }
     }
 }
 
-fn update_hand(mut hand: Query<(&mut Transform, &HandCard, Option<&HoveredCard>)>) {
-    for (mut transform, HandCard { index }, hover) in hand.iter_mut() {
+fn play_card(
+    mouse: Res<Input<MouseButton>>,
+    hand_raycaster: Query<&RayCastSource<HandRaycast>>,
+    mut card_events: EventWriter<ActivateCard>,
+    mut cmds: Commands,
+    mut hand_cards: Query<(Entity, &mut Card, &mut HandCard, &mut Transform)>,
+) {
+    use HoverStatus::{Dragging, Hovered};
+    let query = hand_raycaster.get_single().map(|ray| ray.intersect_top());
+    for (entity, mut card, mut hand_card, mut trans) in hand_cards.iter_mut() {
+        match hand_card.hover {
+            Hovered if mouse.just_pressed(MouseButton::Left) => {
+                let hovered_card = if let Ok(Some((e, _))) = query { e } else { break };
+                if hovered_card == entity {
+                    hand_card.hover = Dragging;
+                    break;
+                }
+            }
+            // TODO: Test where the card was released (if in sleeve, then sleeve cheat
+            // else if far from hand then activate else return to hand)
+            Dragging if mouse.just_released(MouseButton::Left) => {
+                card.set_status(CardStatus::Activated);
+                cmds.entity(entity).remove::<HandCard>();
+                card_events.send(ActivateCard(entity));
+                break;
+            }
+            Dragging => {
+                let intersection = if let Ok(Some((_, i))) = query { i } else { break };
+                let cursor_pos = intersection.position();
+                trans.translation = cursor_pos;
+                break;
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Move progressively cards from [`HandCard`] in front of player camera.
+fn update_hand(
+    hand: Query<&GlobalTransform, With<PlayerHand>>,
+    mut cards: Query<(&mut Transform, &HandCard)>,
+) {
+    use HoverStatus::Hovered;
+    const CARD_SPEED: f32 = 0.15;
+    let hand_transform = hand.single();
+    let hand_pos = hand_transform.translation;
+    for (mut transform, HandCard { index, hover }) in cards.iter_mut() {
         let i_f32 = *index as f32;
-        let vertical_offset = if hover.is_some() { 2.0 } else { 0.0 };
-        let z_offset = if hover.is_some() { 0.1 } else { i_f32 * -0.1 };
-        // TODO: full transform lerp
-        let target = Vec3::new(i_f32 * 1.7 - 2.0, vertical_offset, z_offset);
+        let vertical_offset = if *hover == Hovered { 2.0 } else { 0.9 };
+        let horizontal_offset = i_f32 - 1.0;
+        let z_offset = if *hover == Hovered { 0.01 } else { i_f32 * -0.01 };
+        let target = hand_pos + Vec3::new(horizontal_offset, vertical_offset, z_offset + 0.05);
         let origin = transform.translation;
-        transform.translation += (target - origin) * 0.2;
+        transform.translation += (target - origin) * CARD_SPEED;
+
+        let target = hand_transform.rotation;
+        let origin = transform.rotation;
+        transform.rotation = origin.lerp(target, CARD_SPEED);
     }
 }
 
@@ -122,11 +162,11 @@ impl BevyPlugin for Plugin {
         app.register_inspectable::<HandCard>();
         app.add_plugin(DefaultRaycastingPlugin::<HandRaycast>::default())
             .add_system_set(SystemSet::on_enter(self.0).with_system(spawn_hand))
-            .add_system_to_stage(CoreStage::PreUpdate, update_hand_transform)
             .add_system_set(
                 SystemSet::on_update(self.0)
-                    .with_system(update_hand)
-                    .with_system(select_card)
+                    .with_system(select_card.label("select"))
+                    .with_system(play_card.label("play").after("select"))
+                    .with_system(update_hand.after("play"))
                     .with_system(update_raycast),
             );
     }

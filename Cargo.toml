@@ -20,6 +20,8 @@ enum-map = "2"
 
 bevy_mod_raycast = "0.3"
 
+fastrand = "1.7"
+
 [profile.dev.package."*"]
 opt-level = 1
 

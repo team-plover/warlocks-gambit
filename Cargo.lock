@@ -1818,6 +1818,7 @@ dependencies = [
  "bevy_kira_audio",
  "bevy_mod_raycast",
  "enum-map",
+ "fastrand",
 ]
 
 [[package]]
