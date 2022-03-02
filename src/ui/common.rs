@@ -1,6 +1,6 @@
 use bevy::math::Vec3Swizzles;
 use bevy::prelude::{Plugin as BevyPlugin, *};
-use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
+use bevy_ui_build_macros::{rect, size, unit};
 use bevy_ui_navigation::{systems as nav, Focused, NavigationPlugin};
 
 #[derive(Clone, Component, Default)]
@@ -32,6 +32,20 @@ impl FromWorld for UiAssets {
     fn from_world(world: &mut World) -> Self {
         let assets = world.get_resource::<AssetServer>().unwrap();
         Self { font: assets.load("Boogaloo-Regular.otf") }
+    }
+}
+
+impl UiAssets {
+    pub fn text_bundle(&self, content: &str, font_size: f32) -> TextBundle {
+        let color = Color::ANTIQUE_WHITE;
+        let horizontal = HorizontalAlign::Left;
+        let style = TextStyle { color, font: self.font.clone(), font_size };
+        let align = TextAlignment { horizontal, ..Default::default() };
+        let text = Text::with_section(content, style, align);
+        TextBundle { text, ..Default::default() }
+    }
+    pub fn large_text(&self, content: &str) -> TextBundle {
+        self.text_bundle(content, 60.)
     }
 }
 
@@ -71,5 +85,9 @@ impl BevyPlugin for Plugin {
             .add_system(nav::default_mouse_input)
             .add_system(nav::default_gamepad_input)
             .add_system(update_highlight);
+
+        app.add_startup_system(|mut cmds: Commands| {
+            cmds.spawn_bundle(UiCameraBundle::default());
+        });
     }
 }

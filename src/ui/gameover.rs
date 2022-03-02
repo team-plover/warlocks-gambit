@@ -30,7 +30,6 @@ struct EscapeMessage;
 struct Animation;
 
 fn init(mut commands: Commands, kind: Res<GameOverKind>, ui_assets: Res<UiAssets>) {
-    let font_size = 60.; // for text
     let message = match *kind {
         GameOverKind::PlayerWon => "You won",
         GameOverKind::PlayerLost => "You lost",
@@ -39,16 +38,6 @@ fn init(mut commands: Commands, kind: Res<GameOverKind>, ui_assets: Res<UiAssets
     let skip_message = "Press ESCAPE to skip";
 
     //
-
-    let text = |content: &str| {
-        let style = TextStyle {
-            color: Color::ANTIQUE_WHITE,
-            font: ui_assets.font.clone(),
-            font_size,
-        };
-        let text = Text::with_section(content, style, Default::default());
-        TextBundle { text, ..Default::default() }
-    };
 
     commands
         .spawn_bundle(NodeBundle {
@@ -67,7 +56,9 @@ fn init(mut commands: Commands, kind: Res<GameOverKind>, ui_assets: Res<UiAssets
         })
         .insert(SceneRoot)
         .with_children(|parent| {
-            parent.spawn_bundle(text(message)).insert(Animation);
+            parent
+                .spawn_bundle(ui_assets.large_text(message))
+                .insert(Animation);
         });
 
     commands
@@ -75,7 +66,7 @@ fn init(mut commands: Commands, kind: Res<GameOverKind>, ui_assets: Res<UiAssets
         .insert(SceneRoot)
         .with_children(|parent| {
             parent
-                .spawn_bundle(text(skip_message))
+                .spawn_bundle(ui_assets.large_text(skip_message))
                 .insert(Visibility { is_visible: false })
                 .insert(EscapeMessage);
         });

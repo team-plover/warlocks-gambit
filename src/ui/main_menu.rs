@@ -163,15 +163,8 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
     use MainMenuElem::*;
     use PositionType as PT;
 
-    let text_bundle = |content: &str, font_size: f32| {
-        let color = Color::ANTIQUE_WHITE;
-        let horizontal = HorizontalAlign::Left;
-        let style = TextStyle { color, font: ui_assets.font.clone(), font_size };
-        let align = TextAlignment { horizontal, ..Default::default() };
-        let text = Text::with_section(content, style, align);
-        TextBundle { text, ..Default::default() }
-    };
-    let large_text = |content| text_bundle(content, 60.0);
+    let text_bundle = |content: &str, font_size: f32| ui_assets.text_bundle(content, font_size);
+    let large_text = |content| ui_assets.large_text(content);
     let focusable = Focusable::default();
     let image =
         |image: &Handle<Image>| ImageBundle { image: image.clone().into(), ..Default::default() };
@@ -217,7 +210,6 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
     let master_slider = slider("Master", AudioChannel::Master, 100.0);
     let sfx_slider = slider("Sfx", AudioChannel::Sfx, 50.0);
     let music_slider = slider("Music", AudioChannel::Music, 50.0);
-    cmds.spawn_bundle(UiCameraBundle::default());
     build_ui! {
         #[cmd(cmds)]
         node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
