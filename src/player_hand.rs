@@ -6,6 +6,7 @@ use bevy_mod_raycast::{DefaultRaycastingPlugin, RayCastMesh, RayCastMethod, RayC
 use crate::{
     camera::PlayerCam,
     card::{Card, CardStatus, SpawnCard, Value, WordOfPower},
+    card_effect::ActivateCard,
     state::GameState,
     Participant,
 };
@@ -87,6 +88,8 @@ fn update_raycast(
         }
     }
 }
+
+// TODO: disable hover & dragging when it is not player's turn
 /// Set the [`HoveredCard`] as the last one on which the cursor hovered.
 fn select_card(
     mut cursor: EventReader<CursorMoved>,
@@ -115,6 +118,7 @@ fn select_card(
 fn play_card(
     mouse: Res<Input<MouseButton>>,
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
+    mut card_events: EventWriter<ActivateCard>,
     mut cmds: Commands,
     mut hand_cards: Query<(Entity, &mut Card, &mut HandCard, &mut Transform)>,
 ) {
@@ -134,6 +138,7 @@ fn play_card(
             Dragging if mouse.just_released(MouseButton::Left) => {
                 card.set_status(CardStatus::Activated);
                 cmds.entity(entity).remove::<HandCard>();
+                card_events.send(ActivateCard { 0: entity });
                 break;
             }
             Dragging => {

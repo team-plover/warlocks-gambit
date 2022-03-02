@@ -5,8 +5,9 @@ use bevy::{
 
 use crate::{
     camera::PlayerCam,
-    card_spawner::{OppoCardSpawner, OppoHand, Pile, PlayerCardSpawner},
+    card_spawner::{OppoCardSpawner, OppoHand, PlayerCardSpawner},
     gltf_hook::{GltfHook, GltfInstance},
+    pile::Pile,
     state::GameState,
 };
 
@@ -18,7 +19,7 @@ impl GltfHook for Scene {
             "PlayerCardSpawn" => cmds.insert(PlayerCardSpawner),
             "OppoCardSpawn" => cmds.insert(OppoCardSpawner),
             "OppoHand" => cmds.insert(OppoHand),
-            "Pile" => cmds.insert(Pile),
+            "Pile" => cmds.insert(Pile::default()),
             _ => cmds,
         };
     }

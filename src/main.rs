@@ -2,8 +2,10 @@ use bevy::prelude::*;
 
 mod audio;
 mod card;
+mod card_effect;
 mod gltf_hook;
 mod oppo_hand;
+mod pile;
 mod player_hand;
 mod scene;
 mod state;
@@ -26,10 +28,6 @@ mod card_spawner {
     /// Component attached to where the player draws cards from.
     #[derive(Component)]
     pub struct PlayerCardSpawner;
-
-    /// Where to drop played cards
-    #[derive(Component)]
-    pub struct Pile;
 
     /// Position of the hand of the opposition
     #[derive(Component)]
@@ -63,6 +61,8 @@ fn main() {
         .add_plugin(scene::Plugin(GameState::LoadScene))
         .add_plugin(audio::Plugin)
         .add_plugin(card::Plugin)
+        .add_plugin(pile::Plugin(GameState::Playing))
+        .add_plugin(card_effect::Plugin(GameState::Playing))
         .add_plugin(ui::Plugin(GameState::MainMenu))
         .add_system(setup);
 
