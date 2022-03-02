@@ -3,6 +3,7 @@ use bevy::prelude::*;
 mod audio;
 mod card;
 mod gltf_hook;
+mod oppo_hand;
 mod player_hand;
 mod scene;
 mod state;
@@ -14,6 +15,7 @@ mod camera {
     #[derive(Component)]
     pub struct PlayerCam;
 }
+// TODO: rename this to reflect content
 mod card_spawner {
     use bevy::prelude::Component;
 
@@ -24,6 +26,19 @@ mod card_spawner {
     /// Component attached to where the player draws cards from.
     #[derive(Component)]
     pub struct PlayerCardSpawner;
+
+    /// Where to drop played cards
+    #[derive(Component)]
+    pub struct Pile;
+
+    /// Position of the hand of the opposition
+    #[derive(Component)]
+    pub struct OppoHand;
+}
+
+pub enum Participant {
+    Player,
+    Oppo,
 }
 
 use state::GameState;
@@ -44,6 +59,7 @@ fn main() {
     app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new());
 
     app.add_plugin(player_hand::Plugin(GameState::Playing))
+        .add_plugin(oppo_hand::Plugin(GameState::Playing))
         .add_plugin(scene::Plugin(GameState::LoadScene))
         .add_plugin(audio::Plugin)
         .add_plugin(card::Plugin)

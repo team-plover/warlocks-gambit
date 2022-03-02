@@ -7,6 +7,7 @@ use crate::{
     camera::PlayerCam,
     card::{Card, CardStatus, SpawnCard, Value, WordOfPower},
     state::GameState,
+    Participant,
 };
 
 enum HandRaycast {}
@@ -54,7 +55,7 @@ fn spawn_hand(
     ));
     for (i, value) in [Zero, Two, Seven, Eight].iter().enumerate() {
         card_spawner
-            .spawn_card(Card::new(WordOfPower::Meb, *value))
+            .spawn_card(Card::new(WordOfPower::Meb, *value), Participant::Player)
             .insert_bundle((
                 HandCard::new(i),
                 RayCastMesh::<HandRaycast>::default(),

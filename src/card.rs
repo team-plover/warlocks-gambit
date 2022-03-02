@@ -14,7 +14,10 @@ use bevy::render::{
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use enum_map::{enum_map, Enum, EnumMap};
 
-use crate::card_spawner::PlayerCardSpawner;
+use crate::{
+    card_spawner::{OppoCardSpawner, PlayerCardSpawner},
+    Participant,
+};
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Enum, Clone, Copy, Debug)]
@@ -112,11 +115,19 @@ pub struct SpawnCard<'w, 's> {
     cmds: Commands<'w, 's>,
     assets: Res<'w, CardAssets>,
     player_deck: Query<'w, 's, &'static GlobalTransform, With<PlayerCardSpawner>>,
+    oppo_deck: Query<'w, 's, &'static GlobalTransform, With<OppoCardSpawner>>,
 }
 impl<'w, 's> SpawnCard<'w, 's> {
-    pub fn spawn_card<'a>(&'a mut self, card: Card) -> EntityCommands<'w, 's, 'a> {
+    pub fn spawn_card<'a>(
+        &'a mut self,
+        card: Card,
+        from: Participant,
+    ) -> EntityCommands<'w, 's, 'a> {
         let Card { value, word, .. } = card;
-        let spawner_transform = self.player_deck.single();
+        let spawner_transform = match from {
+            Participant::Oppo => self.oppo_deck.single(),
+            Participant::Player => self.player_deck.single(),
+        };
         let mut card_entity = self.cmds.spawn_bundle((
             card,
             Name::new("Card"),
