@@ -74,5 +74,5 @@ fn main() {
 }
 
 fn setup(mut ambiant_light: ResMut<AmbientLight>) {
-    *ambiant_light = AmbientLight { color: Color::ALICE_BLUE, brightness: 0.9 };
+    *ambiant_light = AmbientLight { color: Color::WHITE, brightness: 1.0 };
 }

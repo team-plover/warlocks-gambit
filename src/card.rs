@@ -94,6 +94,7 @@ struct CardWord;
 #[derive(Component)]
 struct CardValue;
 
+// TODO: make corner more bevelled
 #[rustfmt::skip]
 const CARD_VERTICES: [[f32; 2]; 12] = [
     [-1.0, 1.46],  [-0.988, 1.488],  [-0.95, 1.5],
@@ -257,15 +258,15 @@ impl FromWorld for CardAssets {
         Self {
             card: meshes.add(card_mesh),
             quad: meshes.add(shape::Quad::new(Vec2::splat(1.0)).into()),
-            backface: add_texture_material!("cards/BackFace.PNG"),
-            frontface: add_texture_material!("cards/FrontFace.PNG"),
+            backface: add_texture_material!("cards/BackFace.png"),
+            frontface: add_texture_material!("cards/FrontFace.png"),
             values: enum_map! {
-                value => add_texture_material!(&format!("cards/Value{value:?}.PNG"), alpha: Mask(0.5)),
+                value => add_texture_material!(&format!("cards/Value{value:?}.png"), alpha: Mask(0.5)),
             },
             glow: add_texture_material!("glow.png", alpha: Blend),
             words: enum_map! {
                 word => add_texture_material!(
-                    &format!("cards/Word{word:?}.PNG"),
+                    &format!("cards/Word{word:?}.png"),
                     alpha: Mask(0.5),
                     emissive: word.color()
                 ),

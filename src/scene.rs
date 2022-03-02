@@ -13,7 +13,7 @@ use crate::{
 
 pub enum Scene {}
 impl GltfHook for Scene {
-    fn hook_named_node<'w, 's>(name: &Name, cmds: &mut EntityCommands) {
+    fn hook_named_node(name: &Name, cmds: &mut EntityCommands) {
         match name.as_str() {
             "PlayerPerspective_Orientation" => cmds.insert(PlayerCam),
             "PlayerCardSpawn" => cmds.insert(PlayerCardSpawner),
@@ -31,7 +31,12 @@ fn setup_scene(
     mut scene_spawner: ResMut<SceneSpawner>,
     asset_server: Res<AssetServer>,
 ) {
-    let gltf = scene_spawner.spawn(asset_server.load("scene.glb#Scene0"));
+    let scene = if cfg!(feature = "debug") {
+        "scene_debug.glb#Scene0"
+    } else {
+        "scene.glb#Scene0"
+    };
+    let gltf = scene_spawner.spawn(asset_server.load(scene));
     cmds.spawn().insert(GltfInstance::<Scene>::new(gltf));
 }
 fn exit_load_state(mut state: ResMut<State<GameState>>) {

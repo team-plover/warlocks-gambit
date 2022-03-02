@@ -117,7 +117,7 @@ fn play_card(
             Dragging if mouse.just_released(MouseButton::Left) => {
                 card.set_status(CardStatus::Activated);
                 cmds.entity(entity).remove::<HandCard>();
-                card_events.send(ActivateCard { 0: entity });
+                card_events.send(ActivateCard(entity));
                 break;
             }
             Dragging => {
@@ -142,10 +142,10 @@ fn update_hand(
     let hand_pos = hand_transform.translation;
     for (mut transform, HandCard { index, hover }) in cards.iter_mut() {
         let i_f32 = *index as f32;
-        let vertical_offset = if *hover == Hovered { 1.0 } else { 0.0 };
+        let vertical_offset = if *hover == Hovered { 2.0 } else { 0.9 };
         let horizontal_offset = i_f32 - 1.0;
         let z_offset = if *hover == Hovered { 0.01 } else { i_f32 * -0.01 };
-        let target = hand_pos + Vec3::new(horizontal_offset, vertical_offset, z_offset);
+        let target = hand_pos + Vec3::new(horizontal_offset, vertical_offset, z_offset + 0.05);
         let origin = transform.translation;
         transform.translation += (target - origin) * CARD_SPEED;
 
