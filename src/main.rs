@@ -29,6 +29,10 @@ mod card_spawner {
     #[derive(Component)]
     pub struct PlayerCardSpawner;
 
+    /// Position of the hand of the player
+    #[derive(Component)]
+    pub struct PlayerHand;
+
     /// Position of the hand of the opposition
     #[derive(Component)]
     pub struct OppoHand;

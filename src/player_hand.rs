@@ -7,14 +7,12 @@ use crate::{
     camera::PlayerCam,
     card::{Card, CardStatus, SpawnCard, Value, WordOfPower},
     card_effect::ActivateCard,
+    card_spawner::PlayerHand,
     state::GameState,
     Participant,
 };
 
 enum HandRaycast {}
-
-#[derive(Component)]
-struct Hand;
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(PartialEq)]
@@ -43,20 +41,12 @@ fn spawn_hand(
     mut meshes: ResMut<Assets<Mesh>>,
     cam: Query<Entity, With<PlayerCam>>,
 ) {
-    use Value::{Eight, Seven, Two, Zero};
-    let cam = cam.single();
-    cmds.entity(cam).insert(RayCastSource::<HandRaycast>::new());
-
-    cmds.spawn_bundle((
-        GlobalTransform::default(),
-        Transform::from_xyz(0.0, -0.2, -5.0),
-        Name::new("Player hand"),
-        Hand,
-        Parent(cam),
-    ));
-    for (i, value) in [Zero, Two, Seven, Eight].iter().enumerate() {
+    use Value::{Seven, Two, Zero};
+    cmds.entity(cam.single())
+        .insert(RayCastSource::<HandRaycast>::new());
+    for (i, value) in [Zero, Two, Seven].iter().enumerate() {
         card_spawner
-            .spawn_card(Card::new(WordOfPower::Meb, *value), Participant::Player)
+            .spawn_card(Card::new(WordOfPower::Geh, *value), Participant::Player)
             .insert_bundle((
                 HandCard::new(i),
                 RayCastMesh::<HandRaycast>::default(),
@@ -64,17 +54,6 @@ fn spawn_hand(
                 Visibility::default(),
                 ComputedVisibility::default(),
             ));
-    }
-}
-
-// Workaround the Hand (and children) GlobalTransform not being set correctly
-// when spawned
-fn update_hand_transform(
-    query: Query<Entity, Added<Hand>>,
-    mut cam: Query<&mut Transform, (Without<Hand>, With<PlayerCam>)>,
-) {
-    if query.get_single().is_ok() {
-        cam.single_mut().set_changed();
     }
 }
 
@@ -154,7 +133,7 @@ fn play_card(
 
 /// Move progressively cards from [`HandCard`] in front of player camera.
 fn update_hand(
-    hand: Query<&GlobalTransform, With<Hand>>,
+    hand: Query<&GlobalTransform, With<PlayerHand>>,
     mut cards: Query<(&mut Transform, &HandCard)>,
 ) {
     use HoverStatus::Hovered;
@@ -163,7 +142,7 @@ fn update_hand(
     let hand_pos = hand_transform.translation;
     for (mut transform, HandCard { index, hover }) in cards.iter_mut() {
         let i_f32 = *index as f32;
-        let vertical_offset = if *hover == Hovered { -0.2 } else { -1.2 };
+        let vertical_offset = if *hover == Hovered { 1.0 } else { 0.0 };
         let horizontal_offset = i_f32 - 1.0;
         let z_offset = if *hover == Hovered { 0.01 } else { i_f32 * -0.01 };
         let target = hand_pos + Vec3::new(horizontal_offset, vertical_offset, z_offset);
@@ -183,7 +162,6 @@ impl BevyPlugin for Plugin {
         app.register_inspectable::<HandCard>();
         app.add_plugin(DefaultRaycastingPlugin::<HandRaycast>::default())
             .add_system_set(SystemSet::on_enter(self.0).with_system(spawn_hand))
-            .add_system_to_stage(CoreStage::PreUpdate, update_hand_transform)
             .add_system_set(
                 SystemSet::on_update(self.0)
                     .with_system(select_card.label("select"))
