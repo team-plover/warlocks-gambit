@@ -1,4 +1,4 @@
-use super::ui::*;
+use super::common::*;
 use crate::state::GameState;
 use bevy::prelude::*;
 
@@ -29,7 +29,7 @@ struct EscapeMessage;
 #[derive(Component)]
 struct Animation;
 
-fn init(mut commands: Commands, kind: Res<GameOverKind>, menu_assets: Res<MenuAssets>) {
+fn init(mut commands: Commands, kind: Res<GameOverKind>, ui_assets: Res<UiAssets>) {
     let font_size = 60.; // for text
     let message = match *kind {
         GameOverKind::PlayerWon => "You won",
@@ -43,7 +43,7 @@ fn init(mut commands: Commands, kind: Res<GameOverKind>, menu_assets: Res<MenuAs
     let text = |content: &str| {
         let style = TextStyle {
             color: Color::ANTIQUE_WHITE,
-            font: menu_assets.font.clone(),
+            font: ui_assets.font.clone(),
             font_size,
         };
         let text = Text::with_section(content, style, Default::default());
