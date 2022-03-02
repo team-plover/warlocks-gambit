@@ -5,7 +5,7 @@ use bevy_mod_raycast::{DefaultRaycastingPlugin, RayCastMesh, RayCastMethod, RayC
 
 use crate::{
     camera::PlayerCam,
-    card::{Card, SpawnCard, Value, WordOfPower},
+    card::{Card, SpawnCard, Value, CardStatus, WordOfPower},
     state::GameState,
 };
 
@@ -84,17 +84,22 @@ fn select_card(
     mut cmds: Commands,
     mut cursor: EventReader<CursorMoved>,
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
-    hovered: Query<Entity, With<HoveredCard>>,
+    mut hovered: Query<(Entity, &mut Card), With<HoveredCard>>,
+    mut non_hovered: Query<&mut Card, Without<HoveredCard>>,
 ) {
     let query = hand_raycaster.get_single().map(|ray| ray.intersect_top());
     let has_cursor_moved = cursor.iter().next().is_some();
     if let Ok(Some((hovered_card, _))) = query {
         // `hovered_card` is not the one that already exists
         if hovered.get(hovered_card).is_err() && has_cursor_moved {
-            if let Ok(old_hovered) = hovered.get_single() {
+            if let Ok((old_hovered, mut card)) = hovered.get_single_mut() {
+                card.set_status(CardStatus::Normal);
                 cmds.entity(old_hovered).remove::<HoveredCard>();
             }
             cmds.entity(hovered_card).insert(HoveredCard);
+            if let Ok(mut card) = non_hovered.get_mut(hovered_card) {
+                card.set_status(CardStatus::Hovered);
+            }
         }
     }
 }

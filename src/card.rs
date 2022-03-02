@@ -26,6 +26,19 @@ pub enum WordOfPower {
     Qube,
     Zihbm,
 }
+impl WordOfPower {
+    pub fn color(self) -> Color {
+        use WordOfPower::*;
+        match self {
+            Egeq => Color::LIME_GREEN,
+            Geh => Color::CYAN,
+            Het => Color::PURPLE,
+            Meb => Color::GRAY,
+            Qube => Color::GOLD,
+            Zihbm => Color::PINK,
+        }
+    }
+}
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Enum, Debug, Clone, Copy)]
@@ -43,14 +56,27 @@ pub enum Value {
 }
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum CardStatus {
+    Normal,
+    Hovered,
+    Activated,
+}
+
+#[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component, Debug)]
 pub struct Card {
     word: WordOfPower,
     value: Value,
+    status: CardStatus,
 }
 impl Card {
     pub fn new(word: WordOfPower, value: Value) -> Self {
-        Self { word, value }
+        let status = CardStatus::Normal;
+        Self { word, value, status }
+    }
+    pub fn set_status(&mut self, status: CardStatus) {
+        self.status = status;
     }
 }
 
@@ -58,6 +84,8 @@ impl Card {
 struct CardFace;
 #[derive(Component)]
 struct CardBack;
+#[derive(Component)]
+struct CardGlow;
 #[derive(Component)]
 struct CardWord;
 #[derive(Component)]
@@ -87,7 +115,7 @@ pub struct SpawnCard<'w, 's> {
 }
 impl<'w, 's> SpawnCard<'w, 's> {
     pub fn spawn_card<'a>(&'a mut self, card: Card) -> EntityCommands<'w, 's, 'a> {
-        let Card { value, word } = card;
+        let Card { value, word, .. } = card;
         let spawner_transform = self.player_deck.single();
         let mut card_entity = self.cmds.spawn_bundle((
             card,
@@ -128,15 +156,30 @@ impl<'w, 's> SpawnCard<'w, 's> {
                 ..Default::default()
             })
             .insert_bundle((CardBack, Name::new("Back face")));
+            cmds.spawn_bundle(PbrBundle {
+                mesh: self.assets.quad.clone(),
+                material: self.assets.glow.clone(),
+                transform: Transform::from_xyz(0.0, -0.8, 0.009)
+                    .with_scale(Vec3::new(4.2, 2.2, 0.0)),
+                visibility: Visibility { is_visible: false },
+                ..Default::default()
+            }).insert_bundle((
+                CardGlow,
+                Name::new("Glow"),
+            ));
         });
         card_entity
     }
 }
+
+#[allow(clippy::type_complexity)]
 fn update_card(
     cards: Query<(&Card, &Children), Changed<Card>>,
     assets: Res<CardAssets>,
+    mut mat_assets: ResMut<Assets<StandardMaterial>>,
     mut face_mats: Query<&mut Handle<StandardMaterial>, (Without<CardWord>, With<CardValue>)>,
-    mut word_mats: Query<&mut Handle<StandardMaterial>, With<CardWord>>,
+    mut word_mats: Query<&mut Handle<StandardMaterial>, (With<CardWord>, Without<CardGlow>)>,
+    mut glow_mats: Query<(&mut Visibility, &Handle<StandardMaterial>), (With<CardGlow>, Without<CardValue>)>,
 ) {
     for (card, children) in cards.iter() {
         for child in children.iter() {
@@ -145,6 +188,17 @@ fn update_card(
             }
             if let Ok(mut mat) = word_mats.get_mut(*child) {
                 *mat = assets.words[card.word].clone();
+            }
+            match (card.status, glow_mats.get_mut(*child)) {
+                (CardStatus::Hovered, Ok((mut visible, mat))) => {
+                    let mut mat = mat_assets.get_mut(mat).unwrap();
+                    mat.emissive = card.word.color();
+                    visible.is_visible = true;
+                }
+                (CardStatus::Normal, Ok((mut visible, _))) => {
+                    visible.is_visible = false;
+                }
+                _ => {}
             }
         }
     }
@@ -157,17 +211,20 @@ pub struct CardAssets {
     frontface: Handle<StandardMaterial>,
     quad: Handle<Mesh>,
     words: EnumMap<WordOfPower, Handle<StandardMaterial>>,
+    glow: Handle<StandardMaterial>,
 }
 impl FromWorld for CardAssets {
     fn from_world(world: &mut World) -> Self {
+        use AlphaMode::*;
         macro_rules! add_texture_material {
-            ($texture_path:expr $(, alpha: $alpha_mask:expr)?) => {{
+            ($texture_path:expr $(, alpha: $alpha_mask:expr)? $(, emissive: $emissive:expr)?) => {{
                 let asset_server = world.get_resource::<AssetServer>().unwrap();
                 let image = asset_server.load::<Image, _>($texture_path);
                 let mut mats = world.get_resource_mut::<Assets<_>>().unwrap();
                 mats.add(StandardMaterial {
                     base_color_texture: Some(image),
-                    $(alpha_mode: AlphaMode::Mask($alpha_mask),)?
+                    $(alpha_mode: $alpha_mask,)?
+                    $(emissive: $emissive,)?
                     ..Default::default()
                 })
             }};
@@ -191,10 +248,15 @@ impl FromWorld for CardAssets {
             backface: add_texture_material!("cards/BackFace.PNG"),
             frontface: add_texture_material!("cards/FrontFace.PNG"),
             values: enum_map! {
-                value => add_texture_material!(&format!("cards/Value{value:?}.PNG"), alpha: 0.5),
+                value => add_texture_material!(&format!("cards/Value{value:?}.PNG"), alpha: Mask(0.5)),
             },
+            glow: add_texture_material!("glow.png", alpha: Blend),
             words: enum_map! {
-                word => add_texture_material!(&format!("cards/Word{word:?}.PNG"), alpha: 0.5),
+                word => add_texture_material!(
+                    &format!("cards/Word{word:?}.PNG"),
+                    alpha: Mask(0.5),
+                    emissive: word.color()
+                ),
             },
         }
     }
