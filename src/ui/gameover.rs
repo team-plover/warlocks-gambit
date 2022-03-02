@@ -9,6 +9,7 @@ use bevy::prelude::*;
 // TODO: normal game screen should be drawn when GameOver state is active
 
 #[derive(Clone, Copy, Debug)]
+#[allow(unused)]
 pub enum GameOverKind {
     PlayerWon,
     PlayerLost,

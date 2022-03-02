@@ -3,6 +3,8 @@ use bevy::prelude::*;
 mod audio;
 mod card;
 mod card_effect;
+#[cfg(feature = "debug")] // only include if compiling in debug mode
+mod debug_overlay;
 mod game_ui;
 mod gltf_hook;
 mod oppo_hand;
@@ -12,6 +14,11 @@ mod scene;
 mod state;
 mod ui;
 mod war;
+#[cfg(not(feature = "debug"))] // add a dummy to make sure code doesn't break
+#[macro_export]
+macro_rules! add_dbg_text {
+    ($($whatever:tt)*) => {};
+}
 
 mod camera {
     use bevy::prelude::Component;
@@ -46,14 +53,6 @@ pub enum Participant {
 }
 
 use state::{GameState, TurnState};
-
-#[cfg(debug_assertions)] // only include if compiling in debug mode
-mod debug_overlay;
-#[cfg(not(debug_assertions))] // add a dummy to make sure code doesn't break
-#[macro_export]
-macro_rules! add_dbg_text {
-    ($($whatever:tt)*) => {};
-}
 
 fn main() {
     let mut app = App::new();
