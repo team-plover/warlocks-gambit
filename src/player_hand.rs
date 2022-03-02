@@ -123,8 +123,11 @@ fn play_card(
     for (entity, mut card, mut hand_card, mut trans) in hand_cards.iter_mut() {
         match hand_card.hover {
             Hovered if mouse.just_pressed(MouseButton::Left) => {
-                hand_card.hover = Dragging;
-                break;
+                let hovered_card = if let Ok(Some((e, _))) = query { e } else { break };
+                if hovered_card == entity {
+                    hand_card.hover = Dragging;
+                    break;
+                }
             }
             // TODO: Test where the card was released (if in sleeve, then sleeve cheat
             // else if far from hand then activate else return to hand)
