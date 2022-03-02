@@ -326,7 +326,6 @@ impl BevyPlugin for Plugin {
             .add_system_set(
                 SystemSet::on_update(self.0)
                     .with_system(nav::default_mouse_input)
-                    .with_system(nav::default_gamepad_input)
                     .with_system(update_highlight)
                     .with_system(update_sliders)
                     .with_system(leave_credits)

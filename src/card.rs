@@ -163,10 +163,8 @@ impl<'w, 's> SpawnCard<'w, 's> {
                     .with_scale(Vec3::new(4.2, 2.2, 0.0)),
                 visibility: Visibility { is_visible: false },
                 ..Default::default()
-            }).insert_bundle((
-                CardGlow,
-                Name::new("Glow"),
-            ));
+            })
+            .insert_bundle((CardGlow, Name::new("Glow")));
         });
         card_entity
     }
@@ -179,7 +177,10 @@ fn update_card(
     mut mat_assets: ResMut<Assets<StandardMaterial>>,
     mut face_mats: Query<&mut Handle<StandardMaterial>, (Without<CardWord>, With<CardValue>)>,
     mut word_mats: Query<&mut Handle<StandardMaterial>, (With<CardWord>, Without<CardGlow>)>,
-    mut glow_mats: Query<(&mut Visibility, &Handle<StandardMaterial>), (With<CardGlow>, Without<CardValue>)>,
+    mut glow_mats: Query<
+        (&mut Visibility, &Handle<StandardMaterial>),
+        (With<CardGlow>, Without<CardValue>),
+    >,
 ) {
     for (card, children) in cards.iter() {
         for child in children.iter() {
