@@ -4,6 +4,8 @@ use bevy::{app::AppExit, input::mouse::MouseMotion, window::WindowMode};
 use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
 use bevy_ui_navigation::{Focusable, Focused, NavEvent, NavRequest};
 
+// TODO: wait until background scene is loaded (it should take less than second)
+
 use crate::{
     add_dbg_text,
     audio::{AudioChannel, AudioRequest, SfxParam},
@@ -263,11 +265,41 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
     };
 }
 
+#[derive(Default)]
+struct ScenePreload(Handle<Scene>);
+
+fn load_scene(mut preload: ResMut<ScenePreload>, asset_server: Res<AssetServer>) {
+    let scene = "scene_mainmenu.glb#Scene0";
+    preload.0 = asset_server.load(scene);
+}
+
+fn setup_scene(
+    mut cmds: Commands,
+    mut scene_spawner: ResMut<SceneSpawner>,
+    preload: Res<ScenePreload>,
+) {
+    let scene = preload.0.clone();
+    let parent = cmds
+        .spawn()
+        .insert(MenuRoot)
+        .insert(Name::new("Menu background"))
+        .insert(Transform::default())
+        .insert(GlobalTransform::default())
+        .id();
+    scene_spawner.spawn_as_child(scene, parent);
+}
+
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
-            .add_system_set(SystemSet::on_enter(self.0).with_system(setup_main_menu))
+            .insert_resource(ScenePreload::default())
+            .add_startup_system(load_scene)
+            .add_system_set(
+                SystemSet::on_enter(self.0)
+                    .with_system(setup_main_menu)
+                    .with_system(setup_scene),
+            )
             .add_system_set(SystemSet::on_exit(self.0).with_system(exit_menu))
             .add_system_set(
                 SystemSet::on_update(self.0)
