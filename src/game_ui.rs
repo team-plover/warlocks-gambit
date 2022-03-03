@@ -4,8 +4,12 @@ use std::fmt::Write;
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_ui_build_macros::{build_ui, size, style, unit};
 
-use crate::card_effect::TurnCount;
-use crate::state::{GameState, TurnState};
+use crate::{
+    card::Card,
+    card_effect::TurnCount,
+    pile::{PileCard, PileType},
+    state::{GameState, TurnState},
+};
 
 #[derive(Component, Clone)]
 struct UiRoot;
@@ -90,9 +94,17 @@ fn despawn_game_ui(mut cmds: Commands, query: Query<Entity, With<UiRoot>>) {
 
 fn update_game_ui(
     mut ui_infos: Query<(&mut Text, &UiInfo)>,
+    piles: Query<(&PileCard, &Card)>,
     turn_state: Res<State<TurnState>>,
     turn_counter: Res<TurnCount>,
 ) {
+    let scores = |(pile, card): (&PileCard, &Card)| match pile.which {
+        PileType::Player => (card.value as u32, 0),
+        PileType::Oppo => (0, card.value as u32),
+        PileType::War => (0, 0),
+    };
+    let add_tuples = |(t1_1, t1_2), (t2_1, t2_2)| (t1_1 + t2_1, t1_2 + t2_2);
+    let (player_score, oppo_score) = piles.iter().map(scores).fold((0, 0), add_tuples);
     for (mut text, ui_info) in ui_infos.iter_mut() {
         let txt = &mut text.sections[0].value;
         txt.clear();
@@ -108,10 +120,10 @@ fn update_game_ui(
                 write!(txt, "{turn}").unwrap();
             }
             UiInfo::OppoScore => {
-                write!(txt, "0").unwrap();
+                write!(txt, "{oppo_score}").unwrap();
             }
             UiInfo::PlayerScore => {
-                write!(txt, "0").unwrap();
+                write!(txt, "{player_score}").unwrap();
             }
             UiInfo::CardsLeft => {
                 write!(txt, "60").unwrap();
