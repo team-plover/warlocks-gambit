@@ -18,6 +18,21 @@ pub enum GameOverKind {
 
 //
 
+pub struct GameoverAssets {
+    pub defeat: Handle<Image>,
+    pub victory: Handle<Image>,
+}
+
+impl FromWorld for GameoverAssets {
+    fn from_world(world: &mut World) -> Self {
+        let assets = world.get_resource::<AssetServer>().unwrap();
+        Self {
+            defeat: assets.load("menu/ending_Defeat.png"),
+            victory: assets.load("menu/ending_Victory.png"),
+        }
+    }
+}
+
 /// Cleanup marker
 #[derive(Component, Clone)]
 struct SceneRoot;
@@ -142,6 +157,7 @@ pub struct Plugin;
 impl bevy::app::Plugin for Plugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(GameOverKind::PlayerWon);
+        app.init_resource::<GameoverAssets>();
         app.add_system(enter_state);
 
         app.add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(init));

@@ -1,5 +1,5 @@
-use super::common::*;
 use super::gameover::GameOverKind;
+use super::{common::*, gameover::GameoverAssets};
 use crate::state::GameState;
 use bevy::app::AppExit;
 use bevy::prelude::*;
@@ -13,11 +13,23 @@ enum Button {
     ExitApp,
 }
 
-fn init(mut commands: Commands, ui_assets: Res<UiAssets>, kind: Res<GameOverKind>) {
+fn init(
+    mut commands: Commands,
+    ui_assets: Res<UiAssets>,
+    kind: Res<GameOverKind>,
+    images: Res<GameoverAssets>,
+) {
     let continue_text = match *kind {
         GameOverKind::PlayerWon => "New game",
         GameOverKind::PlayerLost | GameOverKind::CheatSpotted => "Restart",
     };
+    let image = match *kind {
+        GameOverKind::PlayerWon => images.victory.clone(),
+        GameOverKind::PlayerLost | GameOverKind::CheatSpotted => images.defeat.clone(),
+    }
+    .into();
+
+    //
 
     let node = NodeBundle {
         color: Color::NONE.into(),
@@ -42,6 +54,10 @@ fn init(mut commands: Commands, ui_assets: Res<UiAssets>, kind: Res<GameOverKind
                 Name::new("Cursor")
             ],
             node[; Name::new("Menu columns")](
+                node[
+                    ImageBundle { image, ..Default::default() };
+                    style! { size: size!(auto, 30 pct), }
+                ],
                 node[ui_assets.large_text(continue_text); Focusable::default(), Button::Restart],
                 node[ui_assets.large_text("Exit to main menu"); Focusable::default(), Button::MainMenu],
                 node[ui_assets.large_text("Exit to desktop"); Focusable::default(), Button::ExitApp]
