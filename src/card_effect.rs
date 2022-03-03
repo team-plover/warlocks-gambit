@@ -1,4 +1,6 @@
-//! What happens after activating a card
+//! What happens after activating a card (including win/loss conditions and
+//! score tracking, this module should be renamed into "game_state" or
+//! something)
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::{Plugin as BevyPlugin, *};
@@ -7,8 +9,10 @@ use crate::{
     card::Card,
     card_spawner::CardOrigin,
     cheat::SleeveCard,
+    deck::{OppoDeck, PlayerDeck},
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
+    ui::gameover::GameOverKind,
     war::BattleOutcome,
     Participant,
 };
@@ -103,6 +107,7 @@ fn handle_turn_end(
     }
 }
 
+// Sets of cards that are not in piles (aka: in hand)
 type HandFilter = (With<CardOrigin>, Without<PileCard>, Without<SleeveCard>);
 
 #[allow(clippy::type_complexity)]
@@ -110,8 +115,27 @@ fn handle_new_turn(
     mut initative: ResMut<Initiative>,
     mut turn: ResMut<State<TurnState>>,
     mut turn_count: ResMut<TurnCount>,
+    mut gameover_events: EventWriter<GameOverKind>,
     hands: Query<(), HandFilter>,
+    player_deck: Res<PlayerDeck>,
+    oppo_deck: Res<OppoDeck>,
+    piles: Query<(&PileCard, &Card)>,
 ) {
+    let remaining_scores = player_deck.score() + oppo_deck.score();
+    let scores = |(pile, card): (&PileCard, &Card)| match pile.which {
+        PileType::Player => (card.value as i32, 0),
+        PileType::Oppo => (0, card.value as i32),
+        PileType::War => (0, 0),
+    };
+    let add_tuples = |(t1_1, t1_2), (t2_1, t2_2)| (t1_1 + t2_1, t1_2 + t2_2);
+    let (player_score, oppo_score) = piles.iter().map(scores).fold((0, 0), add_tuples);
+    if player_score - oppo_score > remaining_scores as i32 {
+        gameover_events.send(GameOverKind::PlayerWon);
+        return;
+    } else if oppo_score - player_score > remaining_scores as i32 {
+        gameover_events.send(GameOverKind::PlayerLost);
+        return;
+    }
     turn_count.0 += 1;
     initative.swap();
     if hands.iter().count() == 0 {
@@ -127,7 +151,6 @@ fn handle_new_turn(
 fn complete_draw(
     initative: Res<Initiative>,
     mut turn: ResMut<State<TurnState>>,
-    // Sets of cards that are not in piles (aka: in hand)
     hands: Query<(), HandFilter>,
 ) {
     if hands.iter().count() >= 6 {
@@ -168,18 +191,33 @@ fn handle_oppo_active(params: ActiveParams) {
     handle_generic_active(TurnState::Player, params);
 }
 
+fn cleanup(
+    mut cmds: Commands,
+    all_cards: Query<Entity, With<Card>>,
+    mut turn_count: ResMut<TurnCount>,
+    mut initative: ResMut<Initiative>,
+) {
+    turn_count.0 = 0;
+    initative.0 = Participant::Player;
+    for entity in all_cards.iter() {
+        cmds.entity(entity).despawn_recursive();
+    }
+}
+
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         use TurnState::{OppoActivated, PlayerActivated};
+        let handle_new_turn = handle_new_turn.before("check_gameover");
         app.add_event::<ActivateCard>()
             .init_resource::<TurnCount>()
             .insert_resource(Initiative(Participant::Player))
             .add_system_set(SystemSet::on_update(self.0).with_system(handle_activated))
-            .add_system_set(SystemSet::on_update(TurnState::New).with_system(handle_new_turn))
+            .add_system_set(SystemSet::on_enter(TurnState::New).with_system(handle_new_turn))
             .add_system_set(SystemSet::on_update(TurnState::Draw).with_system(complete_draw))
             .add_system_set(SystemSet::on_exit(PlayerActivated).with_system(handle_turn_end))
             .add_system_set(SystemSet::on_exit(OppoActivated).with_system(handle_turn_end))
+            .add_system_set(SystemSet::on_exit(self.0).with_system(cleanup))
             .add_system_set(SystemSet::on_update(PlayerActivated).with_system(handle_player_active))
             .add_system_set(SystemSet::on_update(OppoActivated).with_system(handle_oppo_active));
     }

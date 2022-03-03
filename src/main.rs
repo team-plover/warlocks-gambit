@@ -87,7 +87,7 @@ fn main() {
     app.add_plugin(player_hand::Plugin(GameState::Playing))
         .add_plugin(oppo_hand::Plugin(GameState::Playing))
         .add_plugin(scene::Plugin(GameState::LoadScene))
-        .add_plugin(deck::Plugin)
+        .add_plugin(deck::Plugin(GameState::Playing))
         .add_plugin(animate::Plugin)
         .add_plugin(cheat::Plugin)
         .add_plugin(audio::Plugin)
