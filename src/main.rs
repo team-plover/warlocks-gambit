@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+mod animate;
 mod audio;
 mod card;
 mod card_effect;
@@ -82,6 +83,7 @@ fn main() {
         .add_plugin(oppo_hand::Plugin(GameState::Playing))
         .add_plugin(scene::Plugin(GameState::LoadScene))
         .add_plugin(deck::Plugin)
+        .add_plugin(animate::Plugin)
         .add_plugin(audio::Plugin)
         .add_plugin(card::Plugin)
         .add_plugin(ui::common::Plugin)

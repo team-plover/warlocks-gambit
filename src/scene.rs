@@ -4,6 +4,7 @@ use bevy::{
 };
 
 use crate::{
+    animate::Animated,
     camera::PlayerCam,
     card_spawner::{OppoCardSpawner, OppoHand, PlayerCardSpawner, PlayerHand},
     gltf_hook::{GltfHook, GltfInstance},
@@ -19,10 +20,14 @@ impl GltfHook for Scene {
             "PlayerCardSpawn" => cmds.insert(PlayerCardSpawner),
             "OppoCardSpawn" => cmds.insert(OppoCardSpawner),
             "OppoHand" => cmds.insert(OppoHand),
-            "PlayerHand" => cmds.insert(PlayerHand),
+            "PlayerHand" => cmds.insert_bundle((PlayerHand, Animated::bob(2.0, 0.05, 7.0))),
             "Pile" => cmds.insert(Pile::new(PileType::War)),
             "OppoPile" => cmds.insert(Pile::new(PileType::Oppo)),
             "PlayerPile" => cmds.insert(Pile::new(PileType::Player)),
+            "ManBody" => cmds.insert(Animated::breath(0.0, 0.03, 6.0)),
+            "ManHead" => cmds.insert(Animated::bob(6. / 4., 0.1, 6.0)),
+            "Bird" => cmds.insert(Animated::breath(0.0, 0.075, 5.0)),
+            "BirdEyePupilla" => cmds.insert(Animated::bob(5. / 4., 0.02, 5.0)),
             _ => cmds,
         };
     }
