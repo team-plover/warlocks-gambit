@@ -10,6 +10,7 @@ use crate::{
     gltf_hook::{GltfHook, GltfInstance},
     pile::{Pile, PileType},
     state::GameState,
+    ui::gameover::{gameover_prepare_scene, GameOverAnimation},
 };
 
 pub enum Scene {}
@@ -25,10 +26,14 @@ impl GltfHook for Scene {
             "OppoPile" => cmds.insert(Pile::new(PileType::Oppo)),
             "PlayerPile" => cmds.insert(Pile::new(PileType::Player)),
             "ManBody" => cmds.insert(Animated::breath(0.0, 0.03, 6.0)),
-            "ManHead" => cmds.insert(Animated::bob(6. / 4., 0.1, 6.0)),
+            "ManHead" => cmds
+                .insert(Animated::bob(6. / 4., 0.1, 6.0))
+                .insert(GameOverAnimation::Head),
             "Bird" => cmds.insert(Animated::breath(0.0, 0.075, 5.0)),
             "BirdEyePupilla" => cmds.insert(Animated::bob(5. / 4., 0.02, 5.0)),
             "PlayerSleeveStash" => cmds.insert(PlayerSleeve),
+            "ManSkull" => cmds.insert(GameOverAnimation::Skull),
+            "DemonArm" => cmds.insert(GameOverAnimation::DemonArmOppo),
             _ => cmds,
         };
     }
@@ -58,6 +63,7 @@ impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         app.add_system_set(SystemSet::on_enter(self.0).with_system(setup_scene))
             .add_system(exit_load_state.with_run_criteria(Scene::when_spawned))
+            .add_system(gameover_prepare_scene.with_run_criteria(Scene::when_spawned))
             .add_system(Scene::hook.with_run_criteria(Scene::when_not_spawned));
     }
 }
