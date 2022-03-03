@@ -100,9 +100,10 @@ fn update_game_ui(
             UiInfo::Playing => {
                 use TurnState::*;
                 let turn = match turn_state.current() {
-                    Player | PlayerActivated => "Player",
-                    None => "Waiting",
-                    Oppo | OppoActivated => "Oppo",
+                    Player => "Player",
+                    New => "Waiting",
+                    Oppo => "Oppo",
+                    PlayerActivated | OppoActivated => "Playing card",
                 };
                 write!(txt, "{turn}").unwrap();
             }

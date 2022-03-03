@@ -26,7 +26,6 @@ pub enum Value {
 }
 impl Value {
     #[rustfmt::skip]
-    #[allow(dead_code)]
     pub fn beats(&self, other: &Self) -> BattleOutcome {
         use BattleOutcome::*;
         use Value::*;
@@ -37,11 +36,14 @@ impl Value {
             (Two,   Zero | One) => Win,
             (Three, Zero | One | Two) => Win,
             (Four,  Zero | One | Two | Three) => Win,
+
             (Zero | One | Two | Three | Four, _) => Loss,
+
             (Five,  Nine | Eight | Seven | Six) => Loss,
             (Six,   Nine | Eight | Seven) => Loss,
             (Seven, Nine | Eight) => Loss,
             (Eight, Nine) => Loss,
+
             (Nine,  Zero) => Loss,
             (Five | Six | Seven | Eight | Nine, _) => Win,
         }

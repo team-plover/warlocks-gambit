@@ -14,6 +14,7 @@ mod scene;
 mod state;
 mod ui;
 mod war;
+
 #[cfg(not(feature = "debug"))] // add a dummy to make sure code doesn't break
 #[macro_export]
 macro_rules! add_dbg_text {
@@ -28,7 +29,11 @@ mod camera {
 }
 // TODO: rename this to reflect content
 mod card_spawner {
+    use super::Participant;
     use bevy::prelude::Component;
+
+    #[derive(Component)]
+    pub struct CardOrigin(pub Participant);
 
     /// Component attached to where the opponent draws cards from.
     #[derive(Component)]
@@ -47,6 +52,7 @@ mod card_spawner {
     pub struct OppoHand;
 }
 
+#[derive(Clone, Copy, PartialEq)]
 pub enum Participant {
     Player,
     Oppo,
@@ -64,7 +70,7 @@ fn main() {
             ..Default::default()
         })
         .add_state(GameState::MainMenu)
-        .add_state(TurnState::None)
+        .add_state(TurnState::New)
         .add_plugins(DefaultPlugins);
 
     #[cfg(feature = "debug")]
@@ -83,16 +89,11 @@ fn main() {
         .add_plugin(pile::Plugin(GameState::Playing))
         .add_plugin(card_effect::Plugin(GameState::Playing))
         .add_plugin(game_ui::Plugin(GameState::Playing))
-        .add_system(setup)
-        .add_system_set(SystemSet::on_enter(GameState::Playing).with_system(enter_game));
+        .add_system(setup);
 
     app.run();
 }
 
 fn setup(mut ambiant_light: ResMut<AmbientLight>) {
     *ambiant_light = AmbientLight { color: Color::WHITE, brightness: 1.0 };
-}
-
-fn enter_game(mut turn_state: ResMut<State<TurnState>>) {
-    turn_state.set(TurnState::Player).unwrap();
 }

@@ -15,7 +15,7 @@ use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use enum_map::{enum_map, Enum, EnumMap};
 
 use crate::{
-    card_spawner::{OppoCardSpawner, PlayerCardSpawner},
+    card_spawner::{CardOrigin, OppoCardSpawner, PlayerCardSpawner},
     war::Value,
     Participant,
 };
@@ -55,8 +55,8 @@ pub enum CardStatus {
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component, Debug)]
 pub struct Card {
-    word: WordOfPower,
-    value: Value,
+    pub word: WordOfPower,
+    pub value: Value,
     status: CardStatus,
 }
 impl Card {
@@ -117,6 +117,7 @@ impl<'w, 's> SpawnCard<'w, 's> {
         };
         let mut card_entity = self.cmds.spawn_bundle((
             card,
+            CardOrigin(from),
             Name::new("Card"),
             GlobalTransform::default(),
             Transform {

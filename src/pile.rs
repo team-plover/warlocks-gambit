@@ -37,7 +37,7 @@ impl Pile {
 pub struct PileCard {
     offset: Transform,
     stack_pos: usize,
-    which: PileType,
+    pub which: PileType,
 }
 
 impl PileCard {
@@ -49,9 +49,6 @@ impl PileCard {
         };
         Self { offset, stack_pos, which }
     }
-    // pub fn last_in_pile(&self, pile: &Pile) -> bool {
-    //     self.stack_pos == pile.stack_size - 1 && self.which == pile.which
-    // }
 }
 
 fn move_to_pile(
@@ -74,6 +71,9 @@ fn move_to_pile(
         transform.rotation = origin.lerp(target, CARD_SPEED);
     }
 }
+
+// TODO: add system to readjust Pile stack_size and PileCard stack_pos in
+// PostUpdate
 
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {

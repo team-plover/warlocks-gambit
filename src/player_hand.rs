@@ -69,7 +69,6 @@ fn update_raycast(
     }
 }
 
-// TODO: disable hover & dragging when it is not player's turn
 /// Set the [`HoveredCard`] as the last one on which the cursor hovered.
 fn select_card(
     mut cursor: EventReader<CursorMoved>,

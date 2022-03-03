@@ -15,5 +15,5 @@ pub enum TurnState {
     PlayerActivated,
     Oppo,
     OppoActivated,
-    None,
+    New,
 }
