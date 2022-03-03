@@ -3,12 +3,12 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
 use crate::{
-    card::{Card, CardStatus, SpawnCard, WordOfPower},
+    card::{Card, CardStatus, SpawnCard},
     card_effect::ActivateCard,
     card_spawner::OppoHand,
+    deck::OppoDeck,
     // pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
-    war::Value,
     Participant,
 };
 
@@ -23,11 +23,10 @@ impl OppoCard {
     }
 }
 
-fn spawn_hand(mut card_spawner: SpawnCard) {
-    use Value::{One, Three, Two};
-    for (i, value) in [One, Two, Three].iter().enumerate() {
+fn draw_hand(mut card_spawner: SpawnCard, mut deck: ResMut<OppoDeck>) {
+    for (i, card) in deck.draw(3).into_iter().enumerate() {
         card_spawner
-            .spawn_card(Card::new(WordOfPower::Egeq, *value), Participant::Oppo)
+            .spawn_card(card, Participant::Oppo)
             .insert(OppoCard::new(i));
     }
 }
@@ -75,7 +74,7 @@ impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         #[cfg(feature = "debug")]
         app.register_inspectable::<OppoCard>();
-        app.add_system_set(SystemSet::on_enter(self.0).with_system(spawn_hand))
+        app.add_system_set(SystemSet::on_enter(TurnState::Draw).with_system(draw_hand))
             .add_system_set(SystemSet::on_enter(TurnState::Oppo).with_system(chose_card))
             .add_system_set(SystemSet::on_update(self.0).with_system(update_oppo_hand));
     }

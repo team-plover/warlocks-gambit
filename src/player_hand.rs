@@ -5,11 +5,11 @@ use bevy_mod_raycast::{DefaultRaycastingPlugin, RayCastMesh, RayCastMethod, RayC
 
 use crate::{
     camera::PlayerCam,
-    card::{Card, CardStatus, SpawnCard, WordOfPower},
+    card::{Card, CardStatus, SpawnCard},
     card_effect::ActivateCard,
     card_spawner::PlayerHand,
+    deck::PlayerDeck,
     state::{GameState, TurnState},
-    war::Value,
     Participant,
 };
 
@@ -36,18 +36,18 @@ impl HandCard {
     }
 }
 
-fn spawn_hand(
+fn draw_hand(
     mut cmds: Commands,
     mut card_spawner: SpawnCard,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut deck: ResMut<PlayerDeck>,
     cam: Query<Entity, With<PlayerCam>>,
 ) {
-    use Value::{Seven, Two, Zero};
     cmds.entity(cam.single())
         .insert(RayCastSource::<HandRaycast>::new());
-    for (i, value) in [Zero, Two, Seven].iter().enumerate() {
+    for (i, card) in deck.draw(3).into_iter().enumerate() {
         card_spawner
-            .spawn_card(Card::new(WordOfPower::Geh, *value), Participant::Player)
+            .spawn_card(card, Participant::Player)
             .insert_bundle((
                 HandCard::new(i),
                 RayCastMesh::<HandRaycast>::default(),
@@ -162,7 +162,7 @@ impl BevyPlugin for Plugin {
         #[cfg(feature = "debug")]
         app.register_inspectable::<HandCard>();
         app.add_plugin(DefaultRaycastingPlugin::<HandRaycast>::default())
-            .add_system_set(SystemSet::on_enter(self.0).with_system(spawn_hand))
+            .add_system_set(SystemSet::on_enter(TurnState::Draw).with_system(draw_hand))
             .add_system_set(
                 SystemSet::on_update(TurnState::Player)
                     .with_system(select_card.label("select"))

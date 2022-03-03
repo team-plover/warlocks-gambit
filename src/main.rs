@@ -5,6 +5,7 @@ mod card;
 mod card_effect;
 #[cfg(feature = "debug")] // only include if compiling in debug mode
 mod debug_overlay;
+mod deck;
 mod game_ui;
 mod gltf_hook;
 mod oppo_hand;
@@ -70,7 +71,7 @@ fn main() {
             ..Default::default()
         })
         .add_state(GameState::MainMenu)
-        .add_state(TurnState::New)
+        .add_state(TurnState::Starting)
         .add_plugins(DefaultPlugins);
 
     #[cfg(feature = "debug")]
@@ -80,6 +81,7 @@ fn main() {
     app.add_plugin(player_hand::Plugin(GameState::Playing))
         .add_plugin(oppo_hand::Plugin(GameState::Playing))
         .add_plugin(scene::Plugin(GameState::LoadScene))
+        .add_plugin(deck::Plugin)
         .add_plugin(audio::Plugin)
         .add_plugin(card::Plugin)
         .add_plugin(ui::common::Plugin)
@@ -89,6 +91,7 @@ fn main() {
         .add_plugin(pile::Plugin(GameState::Playing))
         .add_plugin(card_effect::Plugin(GameState::Playing))
         .add_plugin(game_ui::Plugin(GameState::Playing))
+        .add_system(first_draw.with_run_criteria(State::on_enter(GameState::Playing)))
         .add_system(setup);
 
     app.run();
@@ -96,4 +99,8 @@ fn main() {
 
 fn setup(mut ambiant_light: ResMut<AmbientLight>) {
     *ambiant_light = AmbientLight { color: Color::WHITE, brightness: 1.0 };
+}
+
+fn first_draw(mut state: ResMut<State<TurnState>>) {
+    state.set(TurnState::Draw).unwrap();
 }

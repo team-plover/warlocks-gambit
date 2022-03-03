@@ -7,6 +7,7 @@ use bevy_ui_build_macros::{build_ui, size, style, unit};
 use crate::{
     card::Card,
     card_effect::TurnCount,
+    deck::{OppoDeck, PlayerDeck},
     pile::{PileCard, PileType},
     state::{GameState, TurnState},
 };
@@ -97,6 +98,8 @@ fn update_game_ui(
     piles: Query<(&PileCard, &Card)>,
     turn_state: Res<State<TurnState>>,
     turn_counter: Res<TurnCount>,
+    oppo_deck: Res<OppoDeck>,
+    player_deck: Res<PlayerDeck>,
 ) {
     let scores = |(pile, card): (&PileCard, &Card)| match pile.which {
         PileType::Player => (card.value as u32, 0),
@@ -110,14 +113,8 @@ fn update_game_ui(
         txt.clear();
         match ui_info {
             UiInfo::Playing => {
-                use TurnState::*;
-                let turn = match turn_state.current() {
-                    Player => "Player",
-                    New => "Waiting",
-                    Oppo => "Oppo",
-                    PlayerActivated | OppoActivated => "Playing card",
-                };
-                write!(txt, "{turn}").unwrap();
+                let turn = turn_state.current();
+                write!(txt, "{turn:?}").unwrap();
             }
             UiInfo::OppoScore => {
                 write!(txt, "{oppo_score}").unwrap();
@@ -126,7 +123,8 @@ fn update_game_ui(
                 write!(txt, "{player_score}").unwrap();
             }
             UiInfo::CardsLeft => {
-                write!(txt, "60").unwrap();
+                let total_cards = oppo_deck.remaining() + player_deck.remaining();
+                write!(txt, "{total_cards}").unwrap();
             }
             UiInfo::Turns => {
                 write!(txt, "{}", turn_counter.0).unwrap();

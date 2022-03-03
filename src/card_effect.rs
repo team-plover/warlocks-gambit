@@ -106,13 +106,32 @@ fn handle_new_turn(
     mut initative: ResMut<Initiative>,
     mut turn: ResMut<State<TurnState>>,
     mut turn_count: ResMut<TurnCount>,
+    hands: Query<(), (With<CardOrigin>, Without<PileCard>)>,
 ) {
-    match initative.0 {
-        Participant::Oppo => turn.set(TurnState::Oppo).unwrap(),
-        Participant::Player => turn.set(TurnState::Player).unwrap(),
-    };
+    if hands.iter().count() == 0 {
+        turn.set(TurnState::Draw).unwrap();
+    } else {
+        match initative.0 {
+            Participant::Oppo => turn.set(TurnState::Oppo).unwrap(),
+            Participant::Player => turn.set(TurnState::Player).unwrap(),
+        };
+    }
     turn_count.0 += 1;
     initative.swap();
+}
+
+fn complete_draw(
+    initative: Res<Initiative>,
+    mut turn: ResMut<State<TurnState>>,
+    // Sets of cards that are not in piles (aka: in hand)
+    hands: Query<(), (With<CardOrigin>, Without<PileCard>)>,
+) {
+    if hands.iter().count() >= 6 {
+        match initative.0 {
+            Participant::Oppo => turn.set(TurnState::Oppo).unwrap(),
+            Participant::Player => turn.set(TurnState::Player).unwrap(),
+        };
+    }
 }
 
 #[derive(SystemParam)]
@@ -154,6 +173,7 @@ impl BevyPlugin for Plugin {
             .insert_resource(Initiative(Participant::Player))
             .add_system_set(SystemSet::on_update(self.0).with_system(handle_activated))
             .add_system_set(SystemSet::on_update(TurnState::New).with_system(handle_new_turn))
+            .add_system_set(SystemSet::on_update(TurnState::Draw).with_system(complete_draw))
             .add_system_set(SystemSet::on_exit(PlayerActivated).with_system(handle_turn_end))
             .add_system_set(SystemSet::on_exit(OppoActivated).with_system(handle_turn_end))
             .add_system_set(SystemSet::on_update(PlayerActivated).with_system(handle_player_active))
