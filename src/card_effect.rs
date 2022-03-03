@@ -108,6 +108,8 @@ fn handle_new_turn(
     mut turn_count: ResMut<TurnCount>,
     hands: Query<(), (With<CardOrigin>, Without<PileCard>)>,
 ) {
+    turn_count.0 += 1;
+    initative.swap();
     if hands.iter().count() == 0 {
         turn.set(TurnState::Draw).unwrap();
     } else {
@@ -116,8 +118,6 @@ fn handle_new_turn(
             Participant::Player => turn.set(TurnState::Player).unwrap(),
         };
     }
-    turn_count.0 += 1;
-    initative.swap();
 }
 
 fn complete_draw(
