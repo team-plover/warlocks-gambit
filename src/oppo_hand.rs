@@ -42,7 +42,7 @@ fn update_oppo_hand(
     let hand_pos = hand_transform.translation;
     for (mut transform, OppoCard { index }) in cards.iter_mut() {
         let i_f32 = *index as f32;
-        let target = hand_pos + Vec3::new(i_f32 - 1.0, 0.0, i_f32 * -0.01);
+        let target = hand_pos + Vec3::new(i_f32 * 1.2 - 1.0, 0.0, 0.0);
         let origin = transform.translation;
         transform.translation += (target - origin) * card_speed;
 

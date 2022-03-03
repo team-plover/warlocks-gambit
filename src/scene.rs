@@ -19,7 +19,7 @@ impl GltfHook for Scene {
             "PlayerPerspective_Orientation" => cmds.insert(PlayerCam),
             "PlayerCardSpawn" => cmds.insert(PlayerCardSpawner),
             "OppoCardSpawn" => cmds.insert(OppoCardSpawner),
-            "OppoHand" => cmds.insert(OppoHand),
+            "OppoHand" => cmds.insert_bundle((OppoHand, Animated::bob(1.0, 0.3, 6.0))),
             "PlayerHand" => cmds.insert_bundle((PlayerHand, Animated::bob(2.0, 0.05, 7.0))),
             "Pile" => cmds.insert(Pile::new(PileType::War)),
             "OppoPile" => cmds.insert(Pile::new(PileType::Oppo)),
