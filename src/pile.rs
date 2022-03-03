@@ -54,8 +54,9 @@ impl PileCard {
 fn move_to_pile(
     pile: Query<(&GlobalTransform, &Pile)>,
     mut cards: Query<(&mut Transform, &PileCard)>,
+    time: Res<Time>,
 ) {
-    const CARD_SPEED: f32 = 0.15;
+    let card_speed = 10.0 * time.delta_seconds();
     for (mut transform, PileCard { offset, stack_pos, which }) in cards.iter_mut() {
         let (pile_transform, _) = pile
             .iter()
@@ -64,11 +65,11 @@ fn move_to_pile(
         let pile_pos = pile_transform.translation;
         let target = pile_pos + offset.translation + Vec3::Y * 0.012 * *stack_pos as f32;
         let origin = transform.translation;
-        transform.translation += (target - origin) * CARD_SPEED;
+        transform.translation += (target - origin) * card_speed;
 
         let target = pile_transform.rotation * offset.rotation;
         let origin = transform.rotation;
-        transform.rotation = origin.lerp(target, CARD_SPEED);
+        transform.rotation = origin.lerp(target, card_speed);
     }
 }
 

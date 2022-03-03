@@ -34,20 +34,21 @@ fn draw_hand(mut card_spawner: SpawnCard, mut deck: ResMut<OppoDeck>) {
 fn update_oppo_hand(
     oppo_hand: Query<&GlobalTransform, With<OppoHand>>,
     mut cards: Query<(&mut Transform, &OppoCard)>,
+    time: Res<Time>,
 ) {
     // TODO: subtile go up/down hover effect
-    const CARD_SPEED: f32 = 0.15;
+    let card_speed = 10.0 * time.delta_seconds();
     let hand_transform = oppo_hand.single();
     let hand_pos = hand_transform.translation;
     for (mut transform, OppoCard { index }) in cards.iter_mut() {
         let i_f32 = *index as f32;
         let target = hand_pos + Vec3::new(i_f32 - 1.0, 0.0, i_f32 * -0.01);
         let origin = transform.translation;
-        transform.translation += (target - origin) * CARD_SPEED;
+        transform.translation += (target - origin) * card_speed;
 
         let target = hand_transform.rotation;
         let origin = transform.rotation;
-        transform.rotation = origin.lerp(target, CARD_SPEED);
+        transform.rotation = origin.lerp(target, card_speed);
     }
 }
 
