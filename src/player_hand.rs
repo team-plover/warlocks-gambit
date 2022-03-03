@@ -1,3 +1,5 @@
+use std::f32::consts::FRAC_PI_4;
+
 use bevy::prelude::{Plugin as BevyPlugin, *};
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
@@ -118,6 +120,7 @@ fn play_card(
                 // TODO: migrate setting that status to card_effect::handle_activated
                 card.set_status(CardStatus::Activated);
                 cmds.entity(entity).remove::<HandCard>();
+                cmds.entity(entity).remove::<RayCastMesh<HandRaycast>>();
                 card_events.send(ActivateCard::new(entity, Participant::Player));
                 break;
             }
@@ -136,23 +139,34 @@ fn play_card(
 fn update_hand(
     hand: Query<&GlobalTransform, With<PlayerHand>>,
     mut cards: Query<(&mut Transform, &HandCard)>,
+    time: Res<Time>,
 ) {
     use HoverStatus::Hovered;
-    const CARD_SPEED: f32 = 0.15;
+    let card_speed = 10.0 * time.delta_seconds();
     let hand_transform = hand.single();
     let hand_pos = hand_transform.translation;
     for (mut transform, HandCard { index, hover }) in cards.iter_mut() {
-        let i_f32 = *index as f32;
-        let vertical_offset = if *hover == Hovered { 2.0 } else { 0.9 };
-        let horizontal_offset = i_f32 - 1.0;
+        let i_f32 = 0.7 * *index as f32;
+        let hover_mul = if *hover == Hovered { 2.0 } else { 1.0 };
+        let y_offset = i_f32.cos() * hover_mul;
+        let x_offset = i_f32.sin() * hover_mul;
         let z_offset = if *hover == Hovered { 0.01 } else { i_f32 * -0.01 };
-        let target = hand_pos + Vec3::new(horizontal_offset, vertical_offset, z_offset + 0.05);
+        let target = hand_pos + Vec3::new(x_offset - 0.3, y_offset, z_offset + 0.05);
         let origin = transform.translation;
-        transform.translation += (target - origin) * CARD_SPEED;
+        transform.translation += (target - origin) * card_speed;
 
-        let target = hand_transform.rotation;
+        let rot_offset = Quat::from_rotation_z(FRAC_PI_4 * -i_f32);
+        let target = hand_transform.rotation * rot_offset;
         let origin = transform.rotation;
-        transform.rotation = origin.lerp(target, CARD_SPEED);
+        transform.rotation = origin.lerp(target, card_speed);
+    }
+}
+
+fn update_hand_indexes(mut cards: Query<&mut HandCard>) {
+    let mut cards: Vec<_> = cards.iter_mut().collect();
+    cards.sort_by_key(|c| c.index);
+    for (index, card) in cards.iter_mut().enumerate() {
+        card.index = index;
     }
 }
 
@@ -169,6 +183,10 @@ impl BevyPlugin for Plugin {
                     .with_system(play_card.label("play").after("select"))
                     .with_system(update_raycast),
             )
-            .add_system_set(SystemSet::on_update(self.0).with_system(update_hand.after("play")));
+            .add_system_set(
+                SystemSet::on_update(self.0)
+                    .with_system(update_hand.after("play"))
+                    .with_system(update_hand_indexes),
+            );
     }
 }
