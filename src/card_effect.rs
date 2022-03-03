@@ -6,6 +6,7 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use crate::{
     card::Card,
     card_spawner::CardOrigin,
+    cheat::SleeveCard,
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
     war::BattleOutcome,
@@ -102,11 +103,14 @@ fn handle_turn_end(
     }
 }
 
+type HandFilter = (With<CardOrigin>, Without<PileCard>, Without<SleeveCard>);
+
+#[allow(clippy::type_complexity)]
 fn handle_new_turn(
     mut initative: ResMut<Initiative>,
     mut turn: ResMut<State<TurnState>>,
     mut turn_count: ResMut<TurnCount>,
-    hands: Query<(), (With<CardOrigin>, Without<PileCard>)>,
+    hands: Query<(), HandFilter>,
 ) {
     turn_count.0 += 1;
     initative.swap();
@@ -124,7 +128,7 @@ fn complete_draw(
     initative: Res<Initiative>,
     mut turn: ResMut<State<TurnState>>,
     // Sets of cards that are not in piles (aka: in hand)
-    hands: Query<(), (With<CardOrigin>, Without<PileCard>)>,
+    hands: Query<(), HandFilter>,
 ) {
     if hands.iter().count() >= 6 {
         match initative.0 {

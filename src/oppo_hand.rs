@@ -3,7 +3,7 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
 use crate::{
-    card::{Card, CardStatus, SpawnCard},
+    card::SpawnCard,
     card_effect::ActivateCard,
     card_spawner::OppoHand,
     deck::OppoDeck,
@@ -55,16 +55,14 @@ fn update_oppo_hand(
 fn chose_card(
     mut cmds: Commands,
     mut card_events: EventWriter<ActivateCard>,
-    mut cards: Query<(Entity, &mut Card), With<OppoCard>>,
+    cards: Query<Entity, With<OppoCard>>,
     // pile_cards: Query<&PileCard>,
     // pile: Query<&Pile>,
 ) {
     // use PileType::War;
     // let pile = pile.iter().find(|p| p.which == War).expect("War pile exists");
     // TODO: use an actual heuristic instead of picking first at all time
-    if let Some((selected, mut card)) = cards.iter_mut().next() {
-        // TODO: migrate setting that status to card_effect::handle_activated
-        card.set_status(CardStatus::Activated);
+    if let Some(selected) = cards.iter().next() {
         cmds.entity(selected).remove::<OppoCard>();
         card_events.send(ActivateCard::new(selected, Participant::Oppo));
     }

@@ -4,6 +4,7 @@ mod animate;
 mod audio;
 mod card;
 mod card_effect;
+mod cheat;
 #[cfg(feature = "debug")] // only include if compiling in debug mode
 mod debug_overlay;
 mod deck;
@@ -45,6 +46,10 @@ mod card_spawner {
     #[derive(Component)]
     pub struct PlayerCardSpawner;
 
+    /// Where to stash cards added to sleeve
+    #[derive(Component)]
+    pub struct PlayerSleeve;
+
     /// Position of the hand of the player
     #[derive(Component)]
     pub struct PlayerHand;
@@ -84,6 +89,7 @@ fn main() {
         .add_plugin(scene::Plugin(GameState::LoadScene))
         .add_plugin(deck::Plugin)
         .add_plugin(animate::Plugin)
+        .add_plugin(cheat::Plugin)
         .add_plugin(audio::Plugin)
         .add_plugin(card::Plugin)
         .add_plugin(ui::common::Plugin)

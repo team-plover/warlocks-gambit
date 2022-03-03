@@ -4,6 +4,9 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
+#[derive(Component)]
+pub struct DisableAnimation;
+
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component)]
 pub enum Animated {
@@ -18,6 +21,10 @@ pub enum Animated {
         offset: f64,
         strength: f32,
         period: f64,
+    },
+    MoveInto {
+        target: Transform,
+        speed: f32,
     },
 }
 impl Animated {
@@ -43,10 +50,15 @@ fn enable_animation(animated: Query<(Entity, &Transform), Added<Animated>>, mut 
 
 fn run_animation(
     time: Res<Time>,
-    mut animated: Query<(&mut Transform, &InitialTransform, &Animated)>,
+    mut cmds: Commands,
+    mut animated: Query<
+        (Entity, &mut Transform, &InitialTransform, &Animated),
+        Without<DisableAnimation>,
+    >,
 ) {
+    let delta = time.delta_seconds();
     let time = time.seconds_since_startup();
-    for (mut trans, init, anim) in animated.iter_mut() {
+    for (entity, mut trans, init, anim) in animated.iter_mut() {
         match *anim {
             Animated::Bob { offset, strength, period } => {
                 let anim_offset = (time + offset) % period / period * PI * 2.0;
@@ -65,6 +77,18 @@ fn run_animation(
                 );
                 trans.scale = init.0.scale + scale_offset;
             }
+            Animated::MoveInto { target, speed } => {
+                let (cur_pos, cur_rot) = (trans.translation, trans.rotation);
+                let (target_pos, target_rot) = (target.translation, target.rotation);
+                let pos_diff = cur_pos.distance_squared(target_pos);
+                let rot_diff = cur_rot.angle_between(target_rot);
+                if pos_diff < 0.01 && rot_diff < 0.005 {
+                    cmds.entity(entity).remove::<Animated>();
+                } else {
+                    trans.translation = cur_pos.lerp(target_pos, speed * delta);
+                    trans.rotation = cur_rot.lerp(target_rot, speed * delta);
+                }
+            }
         }
     }
 }
@@ -76,6 +100,7 @@ impl BevyPlugin for Plugin {
         app.register_inspectable::<Animated>()
             .register_inspectable::<InitialTransform>();
 
-        app.add_system(enable_animation).add_system(run_animation);
+        app.add_system(enable_animation)
+            .add_system(run_animation.label("animation"));
     }
 }

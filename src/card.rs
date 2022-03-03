@@ -49,7 +49,6 @@ impl WordOfPower {
 pub enum CardStatus {
     Normal,
     Hovered,
-    Activated,
 }
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
