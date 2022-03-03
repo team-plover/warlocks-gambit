@@ -54,12 +54,12 @@ pub enum CardStatus {
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component, Debug)]
 pub struct Card {
-    pub word: WordOfPower,
+    pub word: Option<WordOfPower>,
     pub value: Value,
     status: CardStatus,
 }
 impl Card {
-    pub fn new(word: WordOfPower, value: Value) -> Self {
+    pub fn new(word: Option<WordOfPower>, value: Value) -> Self {
         let status = CardStatus::Normal;
         Self { word, value, status }
     }
@@ -126,14 +126,16 @@ impl<'w, 's> SpawnCard<'w, 's> {
             },
         ));
         card_entity.with_children(|cmds| {
-            cmds.spawn_bundle(PbrBundle {
-                mesh: self.assets.quad.clone(),
-                material: self.assets.words[word].clone(),
-                transform: Transform::from_xyz(0.0, -0.8, 0.01)
-                    .with_scale(Vec3::new(1.5, 1.0, 1.0)),
-                ..Default::default()
-            })
-            .insert_bundle((CardWord, Name::new("Word")));
+            if let Some(word) = word {
+                cmds.spawn_bundle(PbrBundle {
+                    mesh: self.assets.quad.clone(),
+                    material: self.assets.words[word].clone(),
+                    transform: Transform::from_xyz(0.0, -0.8, 0.01)
+                        .with_scale(Vec3::new(1.5, 1.0, 1.0)),
+                    ..Default::default()
+                })
+                .insert_bundle((CardWord, Name::new("Word")));
+            }
             cmds.spawn_bundle(PbrBundle {
                 mesh: self.assets.quad.clone(),
                 material: self.assets.values[value].clone(),
@@ -185,16 +187,19 @@ fn update_card(
             if let Ok(mut mat) = face_mats.get_mut(*child) {
                 *mat = assets.values[card.value].clone();
             }
-            if let Ok(mut mat) = word_mats.get_mut(*child) {
-                *mat = assets.words[card.word].clone();
+            if let (Ok(mut mat), Some(word)) = (word_mats.get_mut(*child), card.word) {
+                *mat = assets.words[word].clone();
             }
-            match (card.status, glow_mats.get_mut(*child)) {
-                (CardStatus::Hovered, Ok((mut visible, mat))) => {
+            match (card.status, glow_mats.get_mut(*child), card.word) {
+                (CardStatus::Hovered, Ok((mut visible, mat)), Some(word)) => {
                     let mut mat = mat_assets.get_mut(mat).unwrap();
-                    mat.emissive = card.word.color();
+                    mat.emissive = word.color();
                     visible.is_visible = true;
                 }
-                (CardStatus::Normal, Ok((mut visible, _))) => {
+                (_, Ok((mut visible, _)), None) => {
+                    visible.is_visible = false;
+                }
+                (CardStatus::Normal, Ok((mut visible, _)), _) => {
                     visible.is_visible = false;
                 }
                 _ => {}

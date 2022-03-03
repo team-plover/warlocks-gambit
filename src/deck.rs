@@ -50,8 +50,10 @@ macro_rules! impl_deck_methods {
 
 macro_rules! cards {
     ($($value:ident $word:ident |)*) => (
-        Deck::new(vec![ $( Card::new(WordOfPower::$word, Value::$value) ,)* ])
-    )
+        Deck::new(vec![ $( Card::new(cards!(@word $word), Value::$value) ,)* ])
+    );
+    (@word None) => (None);
+    (@word $word:ident) => (Some(WordOfPower::$word));
 }
 
 pub struct PlayerDeck(Deck);
@@ -60,9 +62,9 @@ impl PlayerDeck {
     #[rustfmt::skip]
     fn new() -> Self {
         Self(cards![
-            Zero Egeq  | One Qube | Two Qube   |
-            Three Egeq | Four Egeq | Five Qube |
-            Zero Qube  | Three Meb | Two Geh   |
+            Zero Egeq  | One None   | Two None  |
+            Three Egeq | Four Egeq  | Five None |
+            Zero None  | Three None | Two Geh   |
         ])
     }
 }
@@ -73,9 +75,9 @@ impl OppoDeck {
     #[rustfmt::skip]
     fn new() -> Self {
         Self(cards![
-            Nine Zihbm | Eight Qube | Seven Geh |
-            Six Egeq   | Five Qube  | Nine Egeq |
-            Five Zihbm | Eight Geh  | Four Meb  |
+            Nine None | Eight None | Seven None |
+            Six None  | Five None  | Nine None  |
+            Five None | Eight None | Four None  |
         ])
     }
 }
