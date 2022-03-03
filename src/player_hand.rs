@@ -145,7 +145,8 @@ fn update_hand(
     let card_speed = 10.0 * time.delta_seconds();
     let hand_transform = hand.single();
     let hand_pos = hand_transform.translation;
-    for (mut transform, HandCard { index, hover }) in cards.iter_mut() {
+    let not_dragging = |(_, card): &(_, &HandCard)| card.hover != HoverStatus::Dragging;
+    for (mut transform, HandCard { index, hover }) in cards.iter_mut().filter(not_dragging) {
         let i_f32 = 0.7 * *index as f32;
         let hover_mul = if *hover == Hovered { 2.0 } else { 1.0 };
         let y_offset = i_f32.cos() * hover_mul;
