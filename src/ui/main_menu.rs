@@ -260,10 +260,12 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
                     Name::new("Title Image"),
                     style! { size: size!(auto, 30 pct), }
                 ],
-                node[large_text("Lorithan, vasukas,");],
-                node[large_text("Gibonus, BLucky,");],
-                node[large_text("Xolotl, jpet,");],
-                node[large_text("Samuel_sound");],
+                node[large_text("music, sfx: Samuel_sound");],
+                node[large_text("graphics: Xolotl");],
+                node[large_text("code, voices, design: Gibonus");],
+                node[large_text("more code: vasukas");],
+                node[large_text("thanks: BLucky (devops), Lorithan (game idea)");],
+                node[large_text("Also the BEVY community <3 <3 <3");],
                 node[text_bundle("(Click anywhere to exit)", 30.0);]
             )
         )
