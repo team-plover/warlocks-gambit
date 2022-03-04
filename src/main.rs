@@ -114,6 +114,7 @@ fn main() {
         .add_plugin(ui::main_menu::Plugin(GameState::MainMenu))
         .add_plugin(ui::gameover::Plugin)
         .add_plugin(ui::restart_menu::Plugin)
+        //.add_plugin(ui::pause_menu::Plugin) // TODO: disable player control for this state
         .add_plugin(pile::Plugin(GameState::Playing))
         .add_plugin(card_effect::Plugin(GameState::Playing))
         .add_plugin(game_ui::Plugin(GameState::Playing))

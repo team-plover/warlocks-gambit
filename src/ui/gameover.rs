@@ -5,14 +5,56 @@ use bevy::prelude::*;
 // To enter game over screen send GameOverKind via EventWriter.
 // Upon entering screen animation is played, when it goes to RestartMenu.
 
-// TODO: actual, non-placeholder animation
-// TODO: normal game screen should be drawn when GameOver state is active
+// TODO: add animation
 
 #[derive(Clone, Copy, Debug)]
 pub enum GameOverKind {
     PlayerWon,
     PlayerLost,
     CheatSpotted,
+}
+
+#[derive(Component, Clone, Copy, PartialEq)]
+pub enum GameOverAnimation {
+    Head,
+    Skull,
+    DemonArmOppo,
+}
+
+//
+
+pub struct GameoverAssets {
+    pub defeat: Handle<Image>,
+    pub victory: Handle<Image>,
+}
+
+impl FromWorld for GameoverAssets {
+    fn from_world(world: &mut World) -> Self {
+        let assets = world.get_resource::<AssetServer>().unwrap();
+        Self {
+            defeat: assets.load("menu/ending_Defeat.png"),
+            victory: assets.load("menu/ending_Victory.png"),
+        }
+    }
+}
+
+/// This inits gameover-specific parts of the scene
+pub fn gameover_prepare_scene(
+    gameover: Query<(&Children, &GameOverAnimation)>,
+    mut visibility: Query<&mut Visibility>,
+) {
+    for (children, animation) in gameover.iter() {
+        match animation {
+            GameOverAnimation::Head => (),
+            _ => {
+                for child in children.iter() {
+                    if let Ok(mut v) = visibility.get_mut(*child) {
+                        v.is_visible = false;
+                    }
+                }
+            }
+        }
+    }
 }
 
 //
@@ -25,42 +67,13 @@ struct SceneRoot;
 #[derive(Component)]
 struct EscapeMessage;
 
-/// Placeholder
-#[derive(Component)]
-struct Animation;
-
-fn init(mut commands: Commands, kind: Res<GameOverKind>, ui_assets: Res<UiAssets>) {
-    let message = match *kind {
-        GameOverKind::PlayerWon => "You won",
-        GameOverKind::PlayerLost => "You lost",
-        GameOverKind::CheatSpotted => "You were caught cheating",
-    };
+fn init(
+    mut commands: Commands,
+    ui_assets: Res<UiAssets>,
+    mut start_time: ResMut<StartTime>,
+    time: Res<Time>,
+) {
     let skip_message = "Press ESCAPE to skip";
-
-    //
-
-    commands
-        .spawn_bundle(NodeBundle {
-            color: Color::NONE.into(),
-            style: Style {
-                align_items: AlignItems::Center,
-                align_self: AlignSelf::Center,
-
-                size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
-                position_type: PositionType::Absolute,
-                justify_content: JustifyContent::Center,
-
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(SceneRoot)
-        .with_children(|parent| {
-            parent
-                .spawn_bundle(ui_assets.large_text(message))
-                .insert(Animation);
-        });
-
     commands
         .spawn_bundle(NodeBundle { color: Color::NONE.into(), ..Default::default() })
         .insert(SceneRoot)
@@ -70,6 +83,8 @@ fn init(mut commands: Commands, kind: Res<GameOverKind>, ui_assets: Res<UiAssets
                 .insert(Visibility { is_visible: false })
                 .insert(EscapeMessage);
         });
+
+    start_time.0 = time.seconds_since_startup();
 }
 
 fn interrupt_animation(
@@ -92,18 +107,32 @@ fn cleanup(root: Query<Entity, With<SceneRoot>>, mut commands: Commands) {
     }
 }
 
-fn placeholder_animation(mut entities: Query<&mut Text, With<Animation>>, time: Res<Time>) {
-    fn sine_animation(v0: f32, v1: f32, period_seconds: f32, time: &Time) -> f32 {
-        let t = time.seconds_since_startup() as f32 / period_seconds;
-        let t = (t * std::f32::consts::TAU).sin() * 0.5 + 0.5;
-        v0 * (1. - t) + v1 * t
-    }
+//
 
-    for mut text in entities.iter_mut() {
-        let t = sine_animation(0.2, 1., 2.5, &time);
-        text.sections.get_mut(0).unwrap().style.color.set_r(t);
-    }
+#[derive(Default)]
+struct StartTime(f64); // seconds since startup
+
+#[allow(unused)]
+fn animation(
+    kind: Res<GameOverKind>,
+    start_time: Res<StartTime>,
+    time: Res<Time>,
+    anim_parents: Query<(&Children, &GameOverAnimation)>,
+    mut animatable: Query<(&mut Visibility, &mut Transform)>,
+    mut state: ResMut<State<GameState>>,
+) {
+    let get_animatables = |which: GameOverAnimation| {
+        anim_parents
+            .iter()
+            .find(|(_, anim)| **anim == which)
+            .map(|(children, _)| children.iter().cloned())
+    };
+    let seconds_passed = (time.seconds_since_startup() - start_time.0) as f32;
+
+    state.set(GameState::RestartMenu).unwrap();
 }
+
+//
 
 fn enter_state(
     mut events: EventReader<GameOverKind>,
@@ -141,6 +170,8 @@ pub struct Plugin;
 impl bevy::app::Plugin for Plugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(GameOverKind::PlayerWon);
+        app.insert_resource(StartTime::default());
+        app.init_resource::<GameoverAssets>();
         app.add_system(enter_state.label("check_gameover"));
 
         app.add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(init));
@@ -148,7 +179,7 @@ impl bevy::app::Plugin for Plugin {
         app.add_system_set(
             SystemSet::on_update(GameState::GameOver)
                 .with_system(interrupt_animation)
-                .with_system(placeholder_animation),
+                .with_system(animation),
         );
 
         app.add_event::<GameOverKind>();

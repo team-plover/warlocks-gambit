@@ -7,6 +7,8 @@ pub enum GameState {
     GameOver,
     /// Restart menu after gameover
     RestartMenu,
+    /// In-game settings
+    PauseMenu,
 }
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
