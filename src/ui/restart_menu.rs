@@ -47,7 +47,7 @@ fn init(
     build_ui! {
         #[cmd(commands)]
         node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
-            node{ position_type: PositionType::Absolute }[;
+            node{ position_type: PositionType::Absolute, size: Size::new(Val::Percent(0.), Val::Percent(0.)) }[;
                 UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
                 MenuCursor::default(),
                 Name::new("Cursor")

@@ -221,7 +221,7 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
     build_ui! {
         #[cmd(cmds)]
         node{ min_size: size!(100 pct, 100 pct), flex_direction: FD::Column }[;Name::new("root node"), MenuRoot](
-            node{ position_type: PT::Absolute }[;
+            node{ position_type: PT::Absolute, size: Size::new(Val::Percent(0.), Val::Percent(0.)) }[;
                 UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
                 MenuCursor::default(),
                 Name::new("Cursor")
