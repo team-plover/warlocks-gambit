@@ -1,5 +1,8 @@
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_kira_audio::{Audio, AudioChannel as KiraChannel, AudioPlugin, AudioSource};
+use enum_map::{enum_map, EnumMap};
+
+use crate::card::WordOfPower;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum AudioChannel {
@@ -29,11 +32,15 @@ impl Default for AudioChannels {
 
 struct AudioAssets {
     wood_clink: Handle<AudioSource>,
+    words: EnumMap<WordOfPower, Handle<AudioSource>>,
 }
 impl FromWorld for AudioAssets {
     fn from_world(world: &mut World) -> Self {
         let assets = world.get_resource::<AssetServer>().unwrap();
-        Self { wood_clink: assets.load("wood_clink.ogg") }
+        Self {
+            wood_clink: assets.load("wood_clink.ogg"),
+            words: enum_map! { word => assets.load(&format!("word_audio/{word:?}.ogg")) },
+        }
     }
 }
 
@@ -44,6 +51,7 @@ pub enum SfxParam {
 pub enum AudioRequest {
     StopSfxLoop,
     PlayWoodClink(SfxParam),
+    PlayWord(WordOfPower),
     SetChannelVolume(AudioChannel, f32),
 }
 fn play_audio(
@@ -79,6 +87,9 @@ fn play_audio(
             }
             AudioRequest::PlayWoodClink(SfxParam::PlayOnce) => {
                 audio.play_in_channel(assets.wood_clink.clone(), &channels.sfx);
+            }
+            AudioRequest::PlayWord(word) => {
+                audio.play_in_channel(assets.words[*word].clone(), &channels.sfx);
             }
         }
     }

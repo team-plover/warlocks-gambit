@@ -6,10 +6,12 @@ use bevy::ecs::system::SystemParam;
 use bevy::prelude::{Plugin as BevyPlugin, *};
 
 use crate::{
+    audio::AudioRequest,
     card::{Card, WordOfPower},
     card_spawner::CardOrigin,
     cheat::SleeveCard,
     deck::{OppoDeck, PlayerDeck},
+    game_ui::EffectEvent,
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
     ui::gameover::GameOverKind,
@@ -74,11 +76,13 @@ pub struct TurnCount(pub usize);
 
 fn handle_activated(
     mut events: EventReader<ActivateCard>,
+    mut ui_events: EventWriter<EffectEvent>,
     mut cmds: Commands,
     mut pile: Query<&mut Pile>,
     mut turn: ResMut<State<TurnState>>,
     mut turn_effects: ResMut<TurnEffects>,
     mut seed_count: ResMut<SeedCount>,
+    mut audio_events: EventWriter<AudioRequest>,
     cards: Query<&Card>,
 ) {
     use PileType::War;
@@ -89,7 +93,13 @@ fn handle_activated(
             .find(|p| p.which == War)
             .expect("War pile exists");
         cmds.entity(*card).insert(pile.additional_card());
-        match cards.get(*card).map(|c| c.word) {
+        let card_word = cards.get(*card).map(|c| c.word);
+        if let Ok(Some(word)) = card_word {
+            // TODO: spawn clouds of smoke
+            ui_events.send(EffectEvent::Show(word));
+            audio_events.send(AudioRequest::PlayWord(word));
+        }
+        match card_word {
             Ok(Some(Egeq)) => seed_count.0 += 1,
             Ok(Some(Qube)) => turn_effects.effect = Some(Effect::DoublePoints),
             Ok(Some(Zihbm)) => turn_effects.effect = Some(Effect::InvertValues),
