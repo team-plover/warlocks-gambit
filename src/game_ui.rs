@@ -68,7 +68,7 @@ fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
     };
     build_ui! {
         #[cmd(cmds)]
-        node{ size: size!(100 pct, 100 pct) }(
+        node{ size: size!(100 pct, 100 pct) }[; UiRoot](
             node{ size: size!(20 pct, 100 pct) },
             node{
                 size: size!(60 pct, 100 pct),
@@ -88,7 +88,7 @@ fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
                 size: size!(20 pct, 100 pct),
                 flex_direction: FlexDirection::ColumnReverse,
                 align_items: AlignItems::FlexEnd
-            }[;Name::new("game ui right column"), UiRoot](
+            }[;Name::new("game ui right column")](
                 node[; Name::new("Seeds")](
                     node[text("Seeds: ");],
                     node[text("0"); UiInfo::Seeds]
