@@ -1817,22 +1817,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aab8fc367588b89dcee83ab0fd66b72b50b72fa1904d7095045ace2b0c81c35"
 
 [[package]]
-name = "jambevy"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy-inspector-egui",
- "bevy-ui-build-macros",
- "bevy-ui-navigation",
- "bevy_kira_audio",
- "bevy_mod_raycast",
- "dashmap",
- "enum-map",
- "fastrand",
- "lazy_static",
-]
-
-[[package]]
 name = "jni"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3143,6 +3127,22 @@ dependencies = [
  "same-file",
  "winapi",
  "winapi-util",
+]
+
+[[package]]
+name = "warlocks-gambit"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy-inspector-egui",
+ "bevy-ui-build-macros",
+ "bevy-ui-navigation",
+ "bevy_kira_audio",
+ "bevy_mod_raycast",
+ "dashmap",
+ "enum-map",
+ "fastrand",
+ "lazy_static",
 ]
 
 [[package]]
