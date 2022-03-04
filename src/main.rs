@@ -36,6 +36,10 @@ mod card_spawner {
     use super::Participant;
     use bevy::prelude::Component;
 
+    /// Card in the War pile played by the player
+    #[derive(Component)]
+    pub struct PlayedCard;
+
     #[derive(Component)]
     pub struct CardOrigin(pub Participant);
 

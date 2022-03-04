@@ -8,7 +8,7 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use crate::{
     audio::AudioRequest,
     card::{Card, WordOfPower},
-    card_spawner::CardOrigin,
+    card_spawner::{CardOrigin, PlayedCard},
     cheat::SleeveCard,
     deck::{OppoDeck, PlayerDeck},
     game_ui::EffectEvent,
@@ -92,7 +92,8 @@ fn handle_activated(
             .iter_mut()
             .find(|p| p.which == War)
             .expect("War pile exists");
-        cmds.entity(*card).insert(pile.additional_card());
+        cmds.entity(*card)
+            .insert_bundle((pile.additional_card(), PlayedCard));
         let card_word = cards.get(*card).map(|c| c.word);
         audio_events.send(AudioRequest::PlayShuffleLong);
         if let Ok(Some(word)) = card_word {
@@ -130,7 +131,9 @@ fn handle_turn_end(
         ($entry:expr, $who:expr) => {
             let (_, _, card, entity) = $entry;
             let mut pile = piles.iter_mut().find(|p| p.which == $who.into()).unwrap();
-            cmds.entity(*entity).insert(pile.additional_card());
+            cmds.entity(*entity)
+                .insert(pile.additional_card())
+                .remove::<PlayedCard>();
             match turn_effects.effect {
                 Some(Effect::DoublePoints) => {
                     score_bonuses.add_to_owner($who, card.value as i32);

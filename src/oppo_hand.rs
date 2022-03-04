@@ -1,14 +1,16 @@
 use bevy::prelude::{Plugin as BevyPlugin, *};
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
+use fastrand::usize as randusize;
 
 use crate::{
-    card::SpawnCard,
+    card::{Card, SpawnCard, WordOfPower},
     card_effect::ActivateCard,
-    card_spawner::OppoHand,
+    card_spawner::{OppoHand, PlayedCard},
     deck::OppoDeck,
     // pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
+    war::BattleOutcome,
     Participant,
 };
 
@@ -55,17 +57,50 @@ fn update_oppo_hand(
 fn chose_card(
     mut cmds: Commands,
     mut card_events: EventWriter<ActivateCard>,
-    cards: Query<Entity, With<OppoCard>>,
+    cards: Query<(Entity, &Card), With<OppoCard>>,
+    war_card: Query<&Card, With<PlayedCard>>,
     // pile_cards: Query<&PileCard>,
     // pile: Query<&Pile>,
 ) {
+    use BattleOutcome::{Loss, Win};
+    use WordOfPower::Zihbm;
     // use PileType::War;
     // let pile = pile.iter().find(|p| p.which == War).expect("War pile exists");
     // TODO: use an actual heuristic instead of picking first at all time
-    if let Some(selected) = cards.iter().next() {
-        cmds.entity(selected).remove::<OppoCard>();
-        card_events.send(ActivateCard::new(selected, Participant::Oppo));
-    }
+    let in_hand: Vec<_> = cards.iter().collect();
+    let selected = match war_card.get_single() {
+        Ok(war_card) => {
+            let wins_over_played = |(_, card): &&(_, &Card)| {
+                if war_card.word == Some(Zihbm) {
+                    card.value.beats(&war_card.value) != Win
+                } else {
+                    card.value.beats(&war_card.value) != Loss
+                }
+            };
+            let best_lowest_value = |(_, card): &&(_, &Card)| {
+                if war_card.value == card.value {
+                    u32::MAX
+                } else {
+                    card.value as u32
+                }
+            };
+            let fallback_when_losing =
+                || in_hand.iter().min_by_key(|(_, c)| c.value as u32).unwrap();
+            in_hand
+                .iter()
+                .filter(wins_over_played)
+                .min_by_key(best_lowest_value)
+                .unwrap_or_else(fallback_when_losing)
+                .0
+        }
+        Err(_) => {
+            // Actual random card otherwise it's too easy
+            let selected_index = randusize(..in_hand.len());
+            in_hand[selected_index].0
+        }
+    };
+    cmds.entity(selected).remove::<OppoCard>();
+    card_events.send(ActivateCard::new(selected, Participant::Oppo));
 }
 
 pub struct Plugin(pub GameState);

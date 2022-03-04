@@ -21,7 +21,7 @@ use crate::{
 };
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
-#[derive(Enum, Clone, Copy, Debug)]
+#[derive(Enum, Clone, Copy, Debug, PartialEq)]
 pub enum WordOfPower {
     Egeq,
     Qube,

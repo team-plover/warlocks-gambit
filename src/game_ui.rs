@@ -124,7 +124,6 @@ fn despawn_game_ui(mut cmds: Commands, query: Query<Entity, With<UiRoot>>) {
 
 pub enum EffectEvent {
     Show(WordOfPower),
-    Interupt,
 }
 
 /// Show effect description on screen
@@ -173,9 +172,6 @@ fn handle_effect_events(
                 let (mut img, mut visibility) = image.single_mut();
                 img.0 = ui_assets.words[*word].clone();
                 visibility.is_visible = true;
-            }
-            EffectEvent::Interupt => {
-                display.timeout = 0.0;
             }
         }
     }
