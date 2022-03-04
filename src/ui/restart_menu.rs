@@ -52,6 +52,11 @@ fn init(
                 MenuCursor::default(),
                 Name::new("Cursor")
             ],
+            node{ position_type: PositionType::Absolute }[;
+                UiColor(Color::rgba(0., 0., 0., 0.7)),
+                Name::new("'Shadow'"),
+                style! { size: size!(100 pct, 100 pct), }
+            ],
             node[; Name::new("Menu columns")](
                 node[
                     ImageBundle { image, ..Default::default() };
