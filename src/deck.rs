@@ -1,7 +1,11 @@
 use bevy::prelude::{Plugin as BevyPlugin, *};
 
+use crate::add_dbg_text;
 use crate::{
     card::{Card, WordOfPower},
+    card_spawner,
+    gltf_hook::GltfHook,
+    scene::Scene,
     state::GameState,
     war::Value,
 };
@@ -99,11 +103,49 @@ impl OppoDeck {
     }
 }
 
+fn resize_decks(
+    player_parent: Query<&Children, With<card_spawner::PlayerDeck>>,
+    oppo_parent: Query<&Children, With<card_spawner::OppoDeck>>,
+    meshes_q: Query<&Handle<Mesh>>,
+    player_deck: Res<PlayerDeck>,
+    oppo_deck: Res<OppoDeck>,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
+    use bevy::render::mesh::VertexAttributeValues::Float32x3;
+    let (player, oppo) = (player_parent.single(), oppo_parent.single());
+    if let (Ok(player), Ok(oppo)) = (meshes_q.get(player[0]), meshes_q.get(oppo[0])) {
+        add_dbg_text!("changing deck sizes", 0.1);
+        if let Some(player) = meshes.get_mut(player.clone()) {
+            add_dbg_text!("got the player mesh", 0.1);
+            // 18 -> 0.124
+            // 0 -> -0.9
+            let player_cards = player_deck.remaining() as f32;
+            if let Some(Float32x3(positions)) = player.attribute_mut(Mesh::ATTRIBUTE_POSITION) {
+                for pos in positions.iter_mut().filter(|v| v[1] > -0.9) {
+                    pos[1] = player_cards / 18.0 - 0.9;
+                }
+            }
+        }
+        if let Some(oppo) = meshes.get_mut(oppo.clone()) {
+            add_dbg_text!("got the oppo mesh", 0.1);
+            // 18 -> 0.124
+            // 0 -> -0.9
+            let oppo_cards = oppo_deck.remaining() as f32;
+            if let Some(Float32x3(positions)) = oppo.attribute_mut(Mesh::ATTRIBUTE_POSITION) {
+                for pos in positions.iter_mut().filter(|v| v[1] > -0.9) {
+                    pos[1] = oppo_cards / 18.0 - 0.9;
+                }
+            }
+        }
+    }
+}
+
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(OppoDeck::new())
             .insert_resource(PlayerDeck::new())
+            .add_system(resize_decks.with_run_criteria(Scene::when_spawned))
             .add_system_set(
                 SystemSet::on_exit(self.0).with_system(|mut cmds: Commands| {
                     cmds.insert_resource(OppoDeck::new());

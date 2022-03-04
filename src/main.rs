@@ -39,6 +39,12 @@ mod card_spawner {
     pub struct GameStarts(pub u32);
 
     #[derive(Component)]
+    pub struct PlayerDeck;
+
+    #[derive(Component)]
+    pub struct OppoDeck;
+
+    #[derive(Component)]
     pub struct GrabbedCard;
 
     #[derive(Component)]
