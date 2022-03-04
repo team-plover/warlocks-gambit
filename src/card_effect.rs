@@ -39,14 +39,26 @@ impl ActivateCard {
     }
 }
 
-enum Effect {
-    DoublePoints,
-    InvertValues,
-    ZeroBonus,
-}
-#[derive(Default)]
 struct TurnEffects {
-    effect: Option<Effect>,
+    swap: bool,
+    multiplier: i32,
+    zero_bonus: bool,
+}
+impl Default for TurnEffects {
+    fn default() -> Self {
+        Self { swap: false, multiplier: 1, zero_bonus: false }
+    }
+}
+impl TurnEffects {
+    fn add(&mut self, word: WordOfPower) {
+        use WordOfPower::*;
+        match word {
+            Qube => self.multiplier *= 2,
+            Geh => self.zero_bonus = true,
+            Zihbm => self.swap = !self.swap,
+            _ => {}
+        }
+    }
 }
 
 #[derive(Default)]
@@ -92,6 +104,7 @@ fn handle_activated(
     mut turn_effects: ResMut<TurnEffects>,
     mut seed_count: ResMut<SeedCount>,
     mut audio_events: EventWriter<AudioRequest>,
+    mut tuto_shown: Local<bool>,
     game_starts: Res<GameStarts>,
     cards: Query<&Card>,
 ) {
@@ -113,14 +126,15 @@ fn handle_activated(
         }
         match card_word {
             Ok(Some(Egeq)) => {
-                if game_starts.0 == 2 {
+                if game_starts.0 == 2 && !*tuto_shown {
+                    *tuto_shown = true;
                     ui_events.send(EffectEvent::TutoUseSeed);
                 }
                 seed_count.0 += 1;
             }
-            Ok(Some(Qube)) => turn_effects.effect = Some(Effect::DoublePoints),
-            Ok(Some(Zihbm)) => turn_effects.effect = Some(Effect::InvertValues),
-            Ok(Some(Geh)) => turn_effects.effect = Some(Effect::ZeroBonus),
+            Ok(Some(Qube)) => turn_effects.add(Qube),
+            Ok(Some(Zihbm)) => turn_effects.add(Zihbm),
+            Ok(Some(Geh)) => turn_effects.add(Geh),
             _ => {}
         }
         let new_state = match who {
@@ -149,15 +163,14 @@ fn handle_turn_end(
             cmds.entity(*entity)
                 .insert(pile.additional_card())
                 .remove::<PlayedCard>();
-            match turn_effects.effect {
-                Some(Effect::DoublePoints) => {
-                    score_bonuses.add_to_owner($who, card.value as i32);
-                }
-                Some(Effect::ZeroBonus) if card.value == Value::Zero => {
-                    score_bonuses.add_to_owner($who, 12);
-                }
-                _ => {}
-            }
+            let multi = turn_effects.multiplier - 1;
+            let zero_bonus = if card.value == Value::Zero && turn_effects.zero_bonus {
+                12
+            } else {
+                0
+            };
+            score_bonuses.add_to_owner($who, (card.value as i32) * multi);
+            score_bonuses.add_to_owner($who, zero_bonus * (multi + 1));
         };
     }
     match &war_pile[..] {
@@ -168,7 +181,7 @@ fn handle_turn_end(
                 (card2, card1)
             };
             let mut turn_outcome = player_card.2.value.beats(&oppo_card.2.value);
-            if matches!(turn_effects.effect, Some(Effect::InvertValues)) {
+            if turn_effects.swap {
                 turn_outcome = turn_outcome.invert();
             };
             match turn_outcome {
@@ -185,7 +198,7 @@ fn handle_turn_end(
                     add_card_to_pile!(oppo_card, Player);
                 }
             }
-            turn_effects.effect = None;
+            *turn_effects = TurnEffects::default();
             let err_msg = "handle_turn_end only activated when in '*Activated' state";
             turn.set(TurnState::New).expect(err_msg);
         }

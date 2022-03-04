@@ -9,7 +9,7 @@ use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use bevy_mod_raycast::{DefaultRaycastingPlugin, RayCastMesh, RayCastMethod, RayCastSource};
 
 use crate::{
-    animate::DisableAnimation,
+    animate::{Animated, DisableAnimation},
     audio::AudioRequest::{self, PlayShuffleLong, PlayShuffleShort},
     camera::PlayerCam,
     card::{Card, CardStatus, SpawnCard},
@@ -85,6 +85,7 @@ fn draw_hand(
     for entity in unsleeved.into_iter() {
         cmds.entity(entity)
             .remove::<SleeveCard>()
+            .remove::<Animated>()
             .insert(HandCard::new(0));
     }
 }

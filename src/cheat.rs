@@ -75,6 +75,7 @@ fn execute_cheat(
     mut watch: ResMut<BirdEye>,
     mut cmds: Commands,
     mut events: EventReader<CheatEvent>,
+    mut tuto_shown: Local<bool>,
 ) {
     for event in events.iter() {
         match event {
@@ -83,7 +84,8 @@ fn execute_cheat(
                 if let Ok(mut anim) = bird_eye.get_single_mut() {
                     *anim = Animated::Circle { radius: 0.1, period: 1.0, offset: 0.0 };
                 }
-                if game_starts.0 == 2 {
+                if game_starts.0 == 2 && !*tuto_shown {
+                    *tuto_shown = true;
                     ui.send(EffectEvent::TutoSleeve);
                 }
             }
