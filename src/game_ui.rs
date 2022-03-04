@@ -7,7 +7,7 @@ use enum_map::{enum_map, EnumMap};
 
 use crate::{
     card::WordOfPower,
-    card_effect::{CardStats, SeedCount, TurnCount},
+    card_effect::{CardStats, SeedCount},
     state::{GameState, TurnState},
 };
 
@@ -24,7 +24,6 @@ struct CardEffectImage;
 enum UiInfo {
     Seeds,
     Playing,
-    Turns,
     PlayerScore,
     OppoScore,
     CardsLeft,
@@ -96,10 +95,6 @@ fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
                 node[; Name::new("Playing")](
                     node[text("Turn: ");],
                     node[text("Player"); UiInfo::Playing]
-                ),
-                node[; Name::new("Turn Count")](
-                    node[text("Turn: ");],
-                    node[text("1"); UiInfo::Turns]
                 ),
                 node[; Name::new("Player score")](
                     node[text("Player: ");],
@@ -198,7 +193,6 @@ fn handle_effect_events(
 fn update_game_ui(
     mut ui_infos: Query<(&mut Text, &UiInfo)>,
     turn_state: Res<State<TurnState>>,
-    turn_counter: Res<TurnCount>,
     player_seeds: Res<SeedCount>,
     stats: CardStats,
 ) {
@@ -225,9 +219,6 @@ fn update_game_ui(
             }
             UiInfo::CardsLeft => {
                 write!(txt, "{total_cards}").unwrap();
-            }
-            UiInfo::Turns => {
-                write!(txt, "{}", turn_counter.0).unwrap();
             }
         }
     }

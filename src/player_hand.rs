@@ -14,7 +14,7 @@ use crate::{
     camera::PlayerCam,
     card::{Card, CardStatus, SpawnCard},
     card_effect::ActivateCard,
-    card_spawner::PlayerHand,
+    card_spawner::{GrabbedCard, PlayerHand},
     cheat::{CheatEvent, SleeveCard},
     deck::PlayerDeck,
     state::{GameState, TurnState},
@@ -152,6 +152,7 @@ fn play_card(
             Hovered if mouse.just_pressed(MouseButton::Left) => {
                 let hovered_card = if let Ok(Some((e, _))) = query { e } else { break };
                 if hovered_card == entity {
+                    cmds.entity(entity).insert(GrabbedCard);
                     hand_card.hover = Dragging;
                     break;
                 }
@@ -161,6 +162,7 @@ fn play_card(
                 let cursor_pos = intersection.position();
                 let cards_remaining = card_drawer.deck.remaining() != 0;
                 let can_sleeve = sleeve_cards.iter().count() < 3 && cards_remaining;
+                cmds.entity(entity).remove::<GrabbedCard>();
                 if cursor_pos.x < -1.0 && cursor_pos.y < 4.7 && can_sleeve {
                     card.set_status(CardStatus::Normal);
                     cmds.entity(entity).remove::<HandCard>();

@@ -26,6 +26,13 @@ pub enum Animated {
         target: Transform,
         speed: f32,
     },
+    /// Go in a cirlce on provided axis
+    Circle {
+        offset: f64,
+        radius: f32,
+        period: f64,
+    },
+    Static,
 }
 impl Animated {
     pub fn bob(offset: f64, strength: f32, period: f64) -> Self {
@@ -48,6 +55,16 @@ fn enable_animation(animated: Query<(Entity, &Transform), Added<Animated>>, mut 
     cmds.insert_or_spawn_batch(cmd_buffer);
 }
 
+fn reset_static(
+    mut animated: Query<(&mut Transform, &InitialTransform, &Animated), Changed<Animated>>,
+) {
+    for (mut trans, init, anim) in animated.iter_mut() {
+        if matches!(anim, Animated::Static) {
+            *trans = init.0;
+        }
+    }
+}
+
 fn run_animation(
     time: Res<Time>,
     mut cmds: Commands,
@@ -60,6 +77,7 @@ fn run_animation(
     let time = time.seconds_since_startup();
     for (entity, mut trans, init, anim) in animated.iter_mut() {
         match *anim {
+            Animated::Static => {}
             Animated::Bob { offset, strength, period } => {
                 let anim_offset = (time + offset) % period / period * PI * 2.0;
                 // ao = 0 → 0; ao = 1 → 0.2; ao = 2 → 0
@@ -76,6 +94,11 @@ fn run_animation(
                     (anim_offset as f32).cos() * strength,
                 );
                 trans.scale = init.0.scale + scale_offset;
+            }
+            Animated::Circle { offset, period, radius } => {
+                let anim_offset = ((time + offset) % period / period * PI * 2.0) as f32;
+                let trans_offset = Vec3::new(anim_offset.sin(), anim_offset.cos(), 0.0) * radius;
+                trans.translation = init.0.translation + trans_offset;
             }
             Animated::MoveInto { target, speed } => {
                 let (cur_pos, cur_rot) = (trans.translation, trans.rotation);
@@ -101,6 +124,7 @@ impl BevyPlugin for Plugin {
             .register_inspectable::<InitialTransform>();
 
         app.add_system(enable_animation)
+            .add_system(reset_static)
             .add_system(run_animation.label("animation"));
     }
 }

@@ -6,7 +6,10 @@ use bevy::{
 use crate::{
     animate::Animated,
     camera::PlayerCam,
-    card_spawner::{OppoCardSpawner, OppoHand, PlayerCardSpawner, PlayerHand, PlayerSleeve},
+    card_spawner::{
+        BirdPupil, BirdPupilRoot, OppoCardSpawner, OppoHand, PlayerCardSpawner, PlayerHand,
+        PlayerSleeve,
+    },
     gltf_hook::{GltfHook, GltfInstance},
     pile::{Pile, PileType},
     state::GameState,
@@ -27,7 +30,10 @@ impl GltfHook for Scene {
             "ManBody" => cmds.insert(Animated::breath(0.0, 0.03, 6.0)),
             "ManHead" => cmds.insert(Animated::bob(6. / 4., 0.1, 6.0)),
             "Bird" => cmds.insert(Animated::breath(0.0, 0.075, 5.0)),
-            "BirdEyePupilla" => cmds.insert(Animated::bob(5. / 4., 0.02, 5.0)),
+            "BirdPupillaSprite" => cmds.insert(BirdPupil),
+            "BirdEyePupilla" => {
+                cmds.insert_bundle((BirdPupilRoot, Animated::bob(5. / 4., 0.02, 5.0)))
+            }
             "PlayerSleeveStash" => cmds.insert(PlayerSleeve),
             _ => cmds,
         };
