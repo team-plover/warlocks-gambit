@@ -1,13 +1,13 @@
 use super::common::*;
+use super::main_menu::MenuAssets;
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy::{app::AppExit, input::mouse::MouseMotion, window::WindowMode};
 use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
 use bevy_ui_navigation::{Focusable, Focused, NavEvent, NavRequest};
 
-// TODO: wait until background scene is loaded (it should take less than second)
+// TODO: this is mostly a copy of main menu
 
 use crate::{
-    add_dbg_text,
     audio::{AudioChannel, AudioRequest, SfxParam},
     state::GameState,
 };
@@ -15,34 +15,14 @@ use crate::{
 #[derive(Component)]
 struct MovingSlider;
 
-#[derive(Component, Clone)]
-struct CreditOverlay;
-
 #[derive(Component, Clone, PartialEq)]
 enum MainMenuElem {
-    Start,
+    Continue,
     Exit,
-    Credits,
     LockMouse,
     ToggleFullScreen,
     Set16_9,
     AudioSlider(AudioChannel, f32),
-}
-
-pub struct MenuAssets {
-    title_image: Handle<Image>,
-    pub slider_handle: Handle<Image>,
-    pub slider_bg: Handle<Image>,
-}
-impl FromWorld for MenuAssets {
-    fn from_world(world: &mut World) -> Self {
-        let assets = world.get_resource::<AssetServer>().unwrap();
-        Self {
-            title_image: assets.load("title_image.png"),
-            slider_bg: assets.load("slider_bg.png"),
-            slider_handle: assets.load("slider_handle.png"),
-        }
-    }
 }
 
 fn update_sliders(
@@ -83,9 +63,7 @@ fn update_menu(
     mut events: EventReader<NavEvent>,
     mut exit: EventWriter<AppExit>,
     mut cmds: Commands,
-    mut audio_requests: EventWriter<AudioRequest>,
     mut windows: ResMut<Windows>,
-    mut credit_overlay: Query<&mut Style, With<CreditOverlay>>,
     mut game_state: ResMut<State<GameState>>,
     elems: Query<(&Node, &GlobalTransform, &MainMenuElem)>,
 ) {
@@ -99,20 +77,10 @@ fn update_menu(
                     cmds.entity(from).remove::<MovingSlider>();
                 }
             }
-            NavEvent::Locked(from) => {
-                if let Ok(MainMenuElem::Credits) = elems.get(*from).map(|t| t.2) {
-                    let mut style = credit_overlay.single_mut();
-                    style.display = Display::Flex;
-                }
-            }
             NavEvent::NoChanges { from, request: NavRequest::Action } => {
                 match elems.get(*from.first()).map(|t| t.2) {
+                    Ok(MainMenuElem::Continue) => game_state.pop().unwrap(),
                     Ok(MainMenuElem::Exit) => exit.send(AppExit),
-                    Ok(MainMenuElem::Start) => {
-                        add_dbg_text!("Player pressed the start button");
-                        audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
-                        game_state.set(GameState::LoadScene).unwrap();
-                    }
                     Ok(MainMenuElem::LockMouse) => {
                         let window = windows.get_primary_mut().expect(window_msg);
                         let prev_lock_mode = window.cursor_locked();
@@ -142,25 +110,6 @@ fn update_menu(
             _ => {
                 println!("unhandled nav event: {nav_event:?}");
             }
-        }
-    }
-}
-
-fn leave_credits(
-    mut credit_overlay: Query<&mut Style, With<CreditOverlay>>,
-    mut nav_requests: EventWriter<NavRequest>,
-    gamepad: Res<Input<GamepadButton>>,
-    mouse: Res<Input<MouseButton>>,
-    keyboard: Res<Input<KeyCode>>,
-) {
-    if gamepad.get_just_pressed().len() != 0
-        || mouse.get_just_pressed().len() != 0
-        || keyboard.get_just_pressed().len() != 0
-    {
-        let mut style = credit_overlay.single_mut();
-        if style.display == Display::Flex {
-            style.display = Display::None;
-            nav_requests.send(NavRequest::Free)
         }
     }
 }
@@ -228,14 +177,13 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
             ],
             entity[
                 large_text(""); // I have no idea what I am doing, but it works
-                Name::new("End pacer"),
+                Name::new("End spacer"),
                 style! { size: size!(auto, 10 pct), }
             ],
             node{ flex_direction: FD::Row }[; Name::new("Menu columns")](
-                node[; Name::new("Menu node")](
-                    node[large_text("Start");   focusable, Name::new("Start button"), Start],
-                    node[large_text("Credits"); Focusable::lock(), Name::new("Credits button"), Credits],
-                    node[large_text("Exit");    focusable, Name::new("Exit button"), Exit]
+                node[; Name::new("Continue/exit column")](
+                    node[large_text("Continue"); focusable, Name::new("Continue button"), Continue],
+                    node[large_text("Exit to desktop"); focusable, Name::new("Exit button"), Exit]
                 ),
                 node{ align_items: AlignItems::FlexEnd, margin: rect!(50 px) }[; Name::new("Audio settings")](
                     id(master_slider),
@@ -247,70 +195,33 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
                     node[large_text("Toggle Full screen"); focusable, ToggleFullScreen],
                     node[large_text("Make exactly 16:9"); focusable, Set16_9]
                 )
-            ),
-            node{
-                position_type: PT::Absolute,
-                position: rect!(10 pct),
-                display: Display::None,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center
-            }[; UiColor(Color::rgb(0.1, 0.1, 0.1)), Name::new("Credits overlay"), CreditOverlay](
-                node[
-                    image(&menu_assets.title_image);
-                    Name::new("Title Image"),
-                    style! { size: size!(auto, 30 pct), }
-                ],
-                node[large_text("Lorithan, vasukas,");],
-                node[large_text("Gibonus, BLucky,");],
-                node[large_text("Xolotl, jpet,");],
-                node[large_text("Samuel_sound");],
-                node[text_bundle("(Click anywhere to exit)", 30.0);]
             )
         )
     };
 }
 
-#[derive(Default)]
-struct ScenePreload(Handle<Scene>);
-
-fn load_scene(mut preload: ResMut<ScenePreload>, asset_server: Res<AssetServer>) {
-    let scene = "scene_mainmenu.glb#Scene0";
-    preload.0 = asset_server.load(scene);
+fn toggle_pause_menu(mut keys: ResMut<Input<KeyCode>>, mut game_state: ResMut<State<GameState>>) {
+    if keys.just_pressed(KeyCode::Escape) {
+        keys.reset(KeyCode::Escape);
+        match game_state.current() {
+            GameState::PauseMenu => game_state.pop().unwrap(),
+            _ => game_state.push(GameState::PauseMenu).unwrap(),
+        }
+    }
 }
 
-fn setup_scene(
-    mut cmds: Commands,
-    mut scene_spawner: ResMut<SceneSpawner>,
-    preload: Res<ScenePreload>,
-) {
-    let scene = preload.0.clone();
-    let parent = cmds
-        .spawn()
-        .insert(MenuRoot)
-        .insert(Name::new("Menu background"))
-        .insert(Transform::default())
-        .insert(GlobalTransform::default())
-        .id();
-    scene_spawner.spawn_as_child(scene, parent);
-}
-
-pub struct Plugin(pub GameState);
+pub struct Plugin;
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<MenuAssets>()
-            .insert_resource(ScenePreload::default())
-            .add_startup_system(load_scene)
+        app.add_system_set(SystemSet::on_enter(GameState::PauseMenu).with_system(setup_main_menu))
+            .add_system_set(SystemSet::on_exit(GameState::PauseMenu).with_system(exit_menu))
             .add_system_set(
-                SystemSet::on_enter(self.0)
-                    .with_system(setup_main_menu)
-                    .with_system(setup_scene),
-            )
-            .add_system_set(SystemSet::on_exit(self.0).with_system(exit_menu))
-            .add_system_set(
-                SystemSet::on_update(self.0)
+                SystemSet::on_update(GameState::PauseMenu)
                     .with_system(update_sliders)
-                    .with_system(leave_credits)
                     .with_system(update_menu),
+            )
+            .add_system_set(
+                SystemSet::on_update(GameState::Playing).with_system(toggle_pause_menu),
             );
     }
 }
