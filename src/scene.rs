@@ -45,21 +45,46 @@ impl GltfHook for Scene {
     }
 }
 
-fn setup_scene(
-    mut cmds: Commands,
-    mut scene_spawner: ResMut<SceneSpawner>,
-    asset_server: Res<AssetServer>,
-) {
-    let scene = if cfg!(feature = "debug") {
+#[derive(Default)]
+pub struct ScenePreload {
+    pub game: Handle<bevy::prelude::Scene>,
+    pub main_menu: Handle<bevy::prelude::Scene>,
+}
+
+fn load_scene(asset_server: Res<AssetServer>, mut scene: ResMut<ScenePreload>) {
+    scene.game = asset_server.load(if cfg!(feature = "debug") {
         "scene_debug.glb#Scene0"
     } else {
         "scene.glb#Scene0"
-    };
-    let gltf = scene_spawner.spawn(asset_server.load(scene));
-    cmds.spawn().insert(GltfInstance::<Scene>::new(gltf));
+    });
+    scene.main_menu = asset_server.load("scene_mainmenu.glb#Scene0");
 }
-fn exit_load_state(mut state: ResMut<State<GameState>>) {
-    if state.current() == &GameState::LoadScene {
+
+fn wait_load_scene(
+    scene: Res<ScenePreload>,
+    mut state: ResMut<State<GameState>>,
+    server: Res<AssetServer>,
+) {
+    if server.get_group_load_state([scene.game.id, scene.main_menu.id])
+        == bevy::asset::LoadState::Loaded
+    {
+        state.set(GameState::MainMenu).unwrap();
+    }
+}
+
+fn setup_scene(
+    mut cmds: Commands,
+    mut scene_spawner: ResMut<SceneSpawner>,
+    scene: Res<ScenePreload>,
+    mut state: ResMut<State<GameState>>,
+    mut ugly_hack: Local<u8>, // avoid panic on initing oppo hand
+) {
+    if *ugly_hack == 0 {
+        let gltf = scene_spawner.spawn(scene.game.clone());
+        cmds.spawn().insert(GltfInstance::<Scene>::new(gltf));
+
+        *ugly_hack = 1;
+    } else if *ugly_hack == 1 {
         state.set(GameState::Playing).unwrap();
     }
 }
@@ -67,9 +92,13 @@ fn exit_load_state(mut state: ResMut<State<GameState>>) {
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(SystemSet::on_enter(self.0).with_system(setup_scene))
-            .add_system(exit_load_state.with_run_criteria(Scene::when_spawned))
+        app.add_system_set(SystemSet::on_update(self.0).with_system(setup_scene))
             .add_system(gameover_prepare_scene.with_run_criteria(Scene::when_spawned))
-            .add_system(Scene::hook.with_run_criteria(Scene::when_not_spawned));
+            .add_system(Scene::hook.with_run_criteria(Scene::when_not_spawned))
+            .insert_resource(ScenePreload::default())
+            .add_startup_system(load_scene)
+            .add_system_set(
+                SystemSet::on_update(GameState::ScenePreload).with_system(wait_load_scene),
+            );
     }
 }

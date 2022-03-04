@@ -6,6 +6,7 @@ use bevy_ui_navigation::{Focusable, Focused, NavEvent, NavRequest};
 
 // TODO: wait until background scene is loaded (it should take less than second)
 
+use crate::scene::ScenePreload;
 use crate::{
     add_dbg_text,
     audio::{AudioChannel, AudioRequest, SfxParam},
@@ -272,20 +273,12 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
     };
 }
 
-#[derive(Default)]
-struct ScenePreload(Handle<Scene>);
-
-fn load_scene(mut preload: ResMut<ScenePreload>, asset_server: Res<AssetServer>) {
-    let scene = "scene_mainmenu.glb#Scene0";
-    preload.0 = asset_server.load(scene);
-}
-
 fn setup_scene(
     mut cmds: Commands,
     mut scene_spawner: ResMut<SceneSpawner>,
     preload: Res<ScenePreload>,
 ) {
-    let scene = preload.0.clone();
+    let scene = preload.main_menu.clone();
     let parent = cmds
         .spawn()
         .insert(MenuRoot)
@@ -301,7 +294,6 @@ impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
             .insert_resource(ScenePreload::default())
-            .add_startup_system(load_scene)
             .add_system_set(
                 SystemSet::on_enter(self.0)
                     .with_system(setup_main_menu)
