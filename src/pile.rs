@@ -3,7 +3,7 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use fastrand::f32 as randf32;
 
-use crate::state::GameState;
+use crate::{state::GameState, Participant};
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(PartialEq, Clone, Copy)]
@@ -11,6 +11,14 @@ pub enum PileType {
     War,
     Player,
     Oppo,
+}
+impl From<Participant> for PileType {
+    fn from(who: Participant) -> Self {
+        match who {
+            Participant::Oppo => Self::Oppo,
+            Participant::Player => Self::Player,
+        }
+    }
 }
 
 /// Where to drop played cards

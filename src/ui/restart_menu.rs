@@ -9,7 +9,6 @@ use bevy_ui_navigation::{Focusable, NavEvent, NavRequest};
 #[derive(Component, Clone)]
 enum Button {
     Restart,
-    MainMenu,
     ExitApp,
 }
 
@@ -59,7 +58,6 @@ fn init(
                     style! { size: size!(auto, 30 pct), }
                 ],
                 node[ui_assets.large_text(continue_text); Focusable::default(), Button::Restart],
-                node[ui_assets.large_text("Exit to main menu"); Focusable::default(), Button::MainMenu],
                 node[ui_assets.large_text("Exit to desktop"); Focusable::default(), Button::ExitApp]
             )
         )
@@ -76,7 +74,6 @@ fn update(
         if let NavEvent::NoChanges { from, request: NavRequest::Action } = event {
             match buttons.get(*from.first()) {
                 Ok(Button::Restart) => state.set(GameState::Playing).unwrap(),
-                Ok(Button::MainMenu) => state.set(GameState::MainMenu).unwrap(),
                 Ok(Button::ExitApp) => app_exit.send(AppExit),
                 _ => (),
             }

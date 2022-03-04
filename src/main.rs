@@ -8,6 +8,7 @@ mod cheat;
 #[cfg(feature = "debug")] // only include if compiling in debug mode
 mod debug_overlay;
 mod deck;
+mod detection;
 mod game_ui;
 mod gltf_hook;
 mod oppo_hand;
@@ -84,11 +85,13 @@ fn main() {
     app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new())
         .add_plugin(debug_overlay::Plugin);
 
-    app.add_plugin(player_hand::Plugin(GameState::Playing))
+    app.insert_resource(ClearColor(Color::rgb(0.293, 0.3828, 0.4023)))
+        .add_plugin(player_hand::Plugin(GameState::Playing))
         .add_plugin(oppo_hand::Plugin(GameState::Playing))
         .add_plugin(scene::Plugin(GameState::LoadScene))
-        .add_plugin(deck::Plugin)
+        .add_plugin(deck::Plugin(GameState::Playing))
         .add_plugin(animate::Plugin)
+        .add_plugin(detection::Plugin)
         .add_plugin(cheat::Plugin)
         .add_plugin(audio::Plugin)
         .add_plugin(card::Plugin)
@@ -100,13 +103,17 @@ fn main() {
         .add_plugin(card_effect::Plugin(GameState::Playing))
         .add_plugin(game_ui::Plugin(GameState::Playing))
         .add_system(first_draw.with_run_criteria(State::on_enter(GameState::Playing)))
-        .add_system(setup);
+        .add_startup_system(setup);
 
     app.run();
 }
 
-fn setup(mut ambiant_light: ResMut<AmbientLight>) {
+fn setup(
+    mut ambiant_light: ResMut<AmbientLight>,
+    mut audio_events: EventWriter<audio::AudioRequest>,
+) {
     *ambiant_light = AmbientLight { color: Color::WHITE, brightness: 1.0 };
+    audio_events.send(audio::AudioRequest::StartMusic);
 }
 
 fn first_draw(mut state: ResMut<State<TurnState>>) {

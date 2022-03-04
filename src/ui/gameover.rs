@@ -9,7 +9,6 @@ use bevy::prelude::*;
 // TODO: normal game screen should be drawn when GameOver state is active
 
 #[derive(Clone, Copy, Debug)]
-#[allow(unused)]
 pub enum GameOverKind {
     PlayerWon,
     PlayerLost,
@@ -224,7 +223,7 @@ impl bevy::app::Plugin for Plugin {
         app.insert_resource(GameOverKind::PlayerWon);
         app.insert_resource(StartTime::default());
         app.init_resource::<GameoverAssets>();
-        app.add_system(enter_state);
+        app.add_system(enter_state.label("check_gameover"));
 
         app.add_system_set(SystemSet::on_enter(GameState::GameOver).with_system(init));
         app.add_system_set(SystemSet::on_exit(GameState::GameOver).with_system(cleanup));
