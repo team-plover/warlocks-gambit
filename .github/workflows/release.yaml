@@ -19,6 +19,8 @@ jobs:
       - uses: little-core-labs/get-git-tag@v3.0.1
         id: get_version
       - uses: actions/checkout@v2
+        with:
+          lfs: true
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -60,6 +62,8 @@ jobs:
       - uses: little-core-labs/get-git-tag@v3.0.1
         id: get_version
       - uses: actions/checkout@v2
+        with:
+          lfs: true
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -101,6 +105,8 @@ jobs:
       - uses: little-core-labs/get-git-tag@v3.0.1
         id: get_version
       - uses: actions/checkout@v2
+        with:
+          lfs: true
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -139,6 +145,8 @@ jobs:
       - uses: little-core-labs/get-git-tag@v3.0.1
         id: get_version
       - uses: actions/checkout@v2
+        with:
+          lfs: true
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
