@@ -10,6 +10,7 @@ use bevy_mod_raycast::{DefaultRaycastingPlugin, RayCastMesh, RayCastMethod, RayC
 
 use crate::{
     animate::DisableAnimation,
+    audio::AudioRequest::{self, PlayShuffleLong, PlayShuffleShort},
     camera::PlayerCam,
     card::{Card, CardStatus, SpawnCard},
     card_effect::ActivateCard,
@@ -48,9 +49,11 @@ struct DrawParams<'w, 's> {
     card_spawner: SpawnCard<'w, 's>,
     meshes: ResMut<'w, Assets<Mesh>>,
     deck: ResMut<'w, PlayerDeck>,
+    audio: EventWriter<'w, 's, AudioRequest>,
 }
 impl<'w, 's> DrawParams<'w, 's> {
     fn draw(&mut self, count: usize) {
+        self.audio.send(PlayShuffleLong);
         for (i, card) in self.deck.draw(count).into_iter().enumerate() {
             self.card_spawner
                 .spawn_card(card, Participant::Player)
@@ -102,6 +105,7 @@ fn select_card(
     mut cursor: EventReader<CursorMoved>,
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
     mut hand_cards: Query<(Entity, &mut Card, &mut HandCard)>,
+    mut audio: EventWriter<AudioRequest>,
 ) {
     use HoverStatus::{Dragging, Hovered};
     let query = hand_raycaster.get_single().map(|ray| ray.intersect_top());
@@ -113,6 +117,9 @@ fn select_card(
         for (entity, mut card, mut hand_card) in hand_cards.iter_mut() {
             if entity == hovered_card && hand_card.hover != Dragging {
                 card.set_status(CardStatus::Hovered);
+                if hand_card.hover != Hovered {
+                    audio.send(PlayShuffleShort);
+                }
                 hand_card.hover = Hovered;
             } else if hand_card.hover != Dragging {
                 card.set_status(CardStatus::Normal);

@@ -136,17 +136,19 @@ struct EffectDisplay {
     timeout: f64,
 }
 
-fn show_effects(
+fn hide_effects(
     time: Res<Time>,
     mut display: ResMut<EffectDisplay>,
     mut image: Query<&mut Visibility, With<CardEffectImage>>,
     mut description: Query<&mut Text, With<CardEffectDescription>>,
 ) {
     if display.word.is_some() && display.timeout <= time.seconds_since_startup() {
-        let mut img = image.single_mut();
-        img.is_visible = false;
-        let txt = &mut description.single_mut().sections[0].value;
-        txt.clear();
+        if let Ok(mut img) = image.get_single_mut() {
+            img.is_visible = false;
+        }
+        if let Ok(mut txt) = description.get_single_mut() {
+            txt.sections[0].value.clear();
+        }
         display.word = None;
     }
 }
@@ -224,11 +226,11 @@ impl BevyPlugin for Plugin {
             .add_event::<EffectEvent>()
             .init_resource::<EffectDisplay>()
             .add_system_set(SystemSet::on_enter(self.0).with_system(spawn_game_ui))
+            .add_system(hide_effects)
             .add_system_set(
                 SystemSet::on_update(self.0)
                     .with_system(update_game_ui)
-                    .with_system(handle_effect_events)
-                    .with_system(show_effects),
+                    .with_system(handle_effect_events),
             )
             .add_system_set(SystemSet::on_exit(self.0).with_system(despawn_game_ui));
     }

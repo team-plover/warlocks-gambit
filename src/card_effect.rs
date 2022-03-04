@@ -94,6 +94,7 @@ fn handle_activated(
             .expect("War pile exists");
         cmds.entity(*card).insert(pile.additional_card());
         let card_word = cards.get(*card).map(|c| c.word);
+        audio_events.send(AudioRequest::PlayShuffleLong);
         if let Ok(Some(word)) = card_word {
             // TODO: spawn clouds of smoke
             ui_events.send(EffectEvent::Show(word));

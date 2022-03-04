@@ -103,13 +103,17 @@ fn main() {
         .add_plugin(card_effect::Plugin(GameState::Playing))
         .add_plugin(game_ui::Plugin(GameState::Playing))
         .add_system(first_draw.with_run_criteria(State::on_enter(GameState::Playing)))
-        .add_system(setup);
+        .add_startup_system(setup);
 
     app.run();
 }
 
-fn setup(mut ambiant_light: ResMut<AmbientLight>) {
+fn setup(
+    mut ambiant_light: ResMut<AmbientLight>,
+    mut audio_events: EventWriter<audio::AudioRequest>,
+) {
     *ambiant_light = AmbientLight { color: Color::WHITE, brightness: 1.0 };
+    audio_events.send(audio::AudioRequest::StartMusic);
 }
 
 fn first_draw(mut state: ResMut<State<TurnState>>) {

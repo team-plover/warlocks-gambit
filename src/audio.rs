@@ -32,12 +32,18 @@ impl Default for AudioChannels {
 
 struct AudioAssets {
     wood_clink: Handle<AudioSource>,
+    shuffle_long: Handle<AudioSource>,
+    shuffle_short: Handle<AudioSource>,
+    music: Handle<AudioSource>,
     words: EnumMap<WordOfPower, Handle<AudioSource>>,
 }
 impl FromWorld for AudioAssets {
     fn from_world(world: &mut World) -> Self {
         let assets = world.get_resource::<AssetServer>().unwrap();
         Self {
+            music: assets.load("sfx/music.ogg"),
+            shuffle_long: assets.load("sfx/shuffle_long.ogg"),
+            shuffle_short: assets.load("sfx/shuffle_short.ogg"),
             wood_clink: assets.load("wood_clink.ogg"),
             words: enum_map! { word => assets.load(&format!("word_audio/{word:?}.ogg")) },
         }
@@ -52,6 +58,9 @@ pub enum AudioRequest {
     StopSfxLoop,
     PlayWoodClink(SfxParam),
     PlayWord(WordOfPower),
+    PlayShuffleLong,
+    PlayShuffleShort,
+    StartMusic,
     SetChannelVolume(AudioChannel, f32),
 }
 fn play_audio(
@@ -62,6 +71,9 @@ fn play_audio(
 ) {
     for event in events.iter() {
         match event {
+            AudioRequest::StartMusic => {
+                audio.play_looped_in_channel(assets.music.clone(), &channels.music);
+            }
             AudioRequest::SetChannelVolume(AudioChannel::Sfx, volume) => {
                 channels.volumes.sfx = *volume;
                 let master = channels.volumes.master;
@@ -90,6 +102,12 @@ fn play_audio(
             }
             AudioRequest::PlayWord(word) => {
                 audio.play_in_channel(assets.words[*word].clone(), &channels.sfx);
+            }
+            AudioRequest::PlayShuffleShort => {
+                audio.play_in_channel(assets.shuffle_short.clone(), &channels.sfx);
+            }
+            AudioRequest::PlayShuffleLong => {
+                audio.play_in_channel(assets.shuffle_long.clone(), &channels.sfx);
             }
         }
     }
