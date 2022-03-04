@@ -15,20 +15,20 @@ use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use enum_map::{enum_map, Enum, EnumMap};
 
 use crate::{
-    card_spawner::{OppoCardSpawner, PlayerCardSpawner},
+    card_spawner::{CardOrigin, OppoCardSpawner, PlayerCardSpawner},
     war::Value,
     Participant,
 };
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
-#[derive(Enum, Clone, Copy, Debug)]
+#[derive(Enum, Clone, Copy, Debug, PartialEq)]
 pub enum WordOfPower {
     Egeq,
+    Qube,
+    Zihbm,
     Geh,
     Het,
     Meb,
-    Qube,
-    Zihbm,
 }
 impl WordOfPower {
     pub fn color(self) -> Color {
@@ -42,6 +42,16 @@ impl WordOfPower {
             Zihbm => Color::PINK,
         }
     }
+    pub fn flavor_text(&self) -> &'static str {
+        use WordOfPower::*;
+        match self {
+            Egeq => "Gain a seed",
+            Qube => "Double points",
+            Zihbm => "Swap winners",
+            Geh => "Zero earns 12",
+            _ => "Unimplemented",
+        }
+    }
 }
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
@@ -49,23 +59,33 @@ impl WordOfPower {
 pub enum CardStatus {
     Normal,
     Hovered,
-    Activated,
 }
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component, Debug)]
 pub struct Card {
-    word: WordOfPower,
-    value: Value,
+    pub word: Option<WordOfPower>,
+    pub value: Value,
     status: CardStatus,
 }
 impl Card {
-    pub fn new(word: WordOfPower, value: Value) -> Self {
+    pub fn new(word: Option<WordOfPower>, value: Value) -> Self {
         let status = CardStatus::Normal;
         Self { word, value, status }
     }
     pub fn set_status(&mut self, status: CardStatus) {
         self.status = status;
+    }
+    pub fn max_value(&self) -> i32 {
+        let value = self.value as i32;
+        let word_max_bonus = match self.word {
+            // Zero = 12
+            Some(WordOfPower::Geh) => 12,
+            // Double card value (including opponent's)
+            Some(WordOfPower::Qube) => value + 9,
+            _ => 0,
+        };
+        word_max_bonus + value
     }
 }
 
@@ -117,6 +137,7 @@ impl<'w, 's> SpawnCard<'w, 's> {
         };
         let mut card_entity = self.cmds.spawn_bundle((
             card,
+            CardOrigin(from),
             Name::new("Card"),
             GlobalTransform::default(),
             Transform {
@@ -126,14 +147,16 @@ impl<'w, 's> SpawnCard<'w, 's> {
             },
         ));
         card_entity.with_children(|cmds| {
-            cmds.spawn_bundle(PbrBundle {
-                mesh: self.assets.quad.clone(),
-                material: self.assets.words[word].clone(),
-                transform: Transform::from_xyz(0.0, -0.8, 0.01)
-                    .with_scale(Vec3::new(1.5, 1.0, 1.0)),
-                ..Default::default()
-            })
-            .insert_bundle((CardWord, Name::new("Word")));
+            if let Some(word) = word {
+                cmds.spawn_bundle(PbrBundle {
+                    mesh: self.assets.quad.clone(),
+                    material: self.assets.words[word].clone(),
+                    transform: Transform::from_xyz(0.0, -0.8, 0.01)
+                        .with_scale(Vec3::new(1.5, 1.0, 1.0)),
+                    ..Default::default()
+                })
+                .insert_bundle((CardWord, Name::new("Word")));
+            }
             cmds.spawn_bundle(PbrBundle {
                 mesh: self.assets.quad.clone(),
                 material: self.assets.values[value].clone(),
@@ -185,16 +208,19 @@ fn update_card(
             if let Ok(mut mat) = face_mats.get_mut(*child) {
                 *mat = assets.values[card.value].clone();
             }
-            if let Ok(mut mat) = word_mats.get_mut(*child) {
-                *mat = assets.words[card.word].clone();
+            if let (Ok(mut mat), Some(word)) = (word_mats.get_mut(*child), card.word) {
+                *mat = assets.words[word].clone();
             }
-            match (card.status, glow_mats.get_mut(*child)) {
-                (CardStatus::Hovered, Ok((mut visible, mat))) => {
+            match (card.status, glow_mats.get_mut(*child), card.word) {
+                (CardStatus::Hovered, Ok((mut visible, mat)), Some(word)) => {
                     let mut mat = mat_assets.get_mut(mat).unwrap();
-                    mat.emissive = card.word.color();
+                    mat.emissive = word.color();
                     visible.is_visible = true;
                 }
-                (CardStatus::Normal, Ok((mut visible, _))) => {
+                (_, Ok((mut visible, _)), None) => {
+                    visible.is_visible = false;
+                }
+                (CardStatus::Normal, Ok((mut visible, _)), _) => {
                     visible.is_visible = false;
                 }
                 _ => {}

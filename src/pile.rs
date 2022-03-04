@@ -3,7 +3,7 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use fastrand::f32 as randf32;
 
-use crate::state::GameState;
+use crate::{state::GameState, Participant};
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(PartialEq, Clone, Copy)]
@@ -11,6 +11,14 @@ pub enum PileType {
     War,
     Player,
     Oppo,
+}
+impl From<Participant> for PileType {
+    fn from(who: Participant) -> Self {
+        match who {
+            Participant::Oppo => Self::Oppo,
+            Participant::Player => Self::Player,
+        }
+    }
 }
 
 /// Where to drop played cards
@@ -37,7 +45,7 @@ impl Pile {
 pub struct PileCard {
     offset: Transform,
     stack_pos: usize,
-    which: PileType,
+    pub which: PileType,
 }
 
 impl PileCard {
@@ -49,16 +57,14 @@ impl PileCard {
         };
         Self { offset, stack_pos, which }
     }
-    // pub fn last_in_pile(&self, pile: &Pile) -> bool {
-    //     self.stack_pos == pile.stack_size - 1 && self.which == pile.which
-    // }
 }
 
 fn move_to_pile(
     pile: Query<(&GlobalTransform, &Pile)>,
     mut cards: Query<(&mut Transform, &PileCard)>,
+    time: Res<Time>,
 ) {
-    const CARD_SPEED: f32 = 0.15;
+    let card_speed = 10.0 * time.delta_seconds();
     for (mut transform, PileCard { offset, stack_pos, which }) in cards.iter_mut() {
         let (pile_transform, _) = pile
             .iter()
@@ -67,13 +73,16 @@ fn move_to_pile(
         let pile_pos = pile_transform.translation;
         let target = pile_pos + offset.translation + Vec3::Y * 0.012 * *stack_pos as f32;
         let origin = transform.translation;
-        transform.translation += (target - origin) * CARD_SPEED;
+        transform.translation += (target - origin) * card_speed;
 
         let target = pile_transform.rotation * offset.rotation;
         let origin = transform.rotation;
-        transform.rotation = origin.lerp(target, CARD_SPEED);
+        transform.rotation = origin.lerp(target, card_speed);
     }
 }
+
+// TODO: add system to readjust Pile stack_size and PileCard stack_pos in
+// PostUpdate
 
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
