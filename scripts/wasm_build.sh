@@ -37,6 +37,8 @@ if [ ! -e "$WasmFile" ]; then
 	exit 1
 fi
 
+[ ! -e "$OutDir" ] || rm -r "$OutDir"
+
 $HOME/.cargo/bin/wasm-bindgen \
 	--no-typescript \
 	--out-dir "$OutDir" \
@@ -53,8 +55,6 @@ cp -r assets "$OutDir/assets"
 #
 # Rename JS
 #
-
-[ ! -e "$OutDir" ] || rm -r "$OutDir"
 
 Count=0
 for _ in $OutDir/*.js; do

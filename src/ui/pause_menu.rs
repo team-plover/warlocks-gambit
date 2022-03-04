@@ -167,6 +167,8 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
     let master_slider = slider("Master", AudioChannel::Master, 100.0);
     let sfx_slider = slider("Sfx", AudioChannel::Sfx, 50.0);
     let music_slider = slider("Music", AudioChannel::Music, 50.0);
+
+    #[cfg(not(target_arch = "wasm32"))]
     build_ui! {
         #[cmd(cmds)]
         node{ min_size: size!(100 pct, 100 pct), flex_direction: FD::Column }[;Name::new("root node"), MenuRoot](
@@ -194,6 +196,37 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
                     node[large_text("Lock mouse cursor"); focusable, LockMouse],
                     node[large_text("Toggle Full screen"); focusable, ToggleFullScreen],
                     node[large_text("Make exactly 16:9"); focusable, Set16_9]
+                )
+            )
+        )
+    };
+
+    // TODO: this is copied from code above with few minor changes
+    #[cfg(target_arch = "wasm32")]
+    build_ui! {
+        #[cmd(cmds)]
+        node{ min_size: size!(100 pct, 100 pct), flex_direction: FD::Column }[;Name::new("root node"), MenuRoot](
+            node{ position_type: PT::Absolute, size: Size::new(Val::Percent(0.), Val::Percent(0.)) }[;
+                UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
+                MenuCursor::default(),
+                Name::new("Cursor")
+            ],
+            entity[
+                large_text(""); // I have no idea what I am doing, but it works
+                Name::new("End spacer"),
+                style! { size: size!(auto, 10 pct), }
+            ],
+            node{ flex_direction: FD::Row }[; Name::new("Menu columns")](
+                node[; Name::new("Continue/exit column")](
+                    node[large_text("Continue"); focusable, Name::new("Continue button"), Continue]
+                ),
+                node{ align_items: AlignItems::FlexEnd, margin: rect!(50 px) }[; Name::new("Audio settings")](
+                    id(master_slider),
+                    id(music_slider),
+                    id(sfx_slider)
+                ),
+                node[; Name::new("Graphics column")](
+                    node[large_text("Toggle Full screen"); focusable, ToggleFullScreen]
                 )
             )
         )

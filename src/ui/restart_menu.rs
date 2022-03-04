@@ -44,6 +44,7 @@ fn init(
         ..Default::default()
     };
 
+    #[cfg(not(target_arch = "wasm32"))]
     build_ui! {
         #[cmd(commands)]
         node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
@@ -64,6 +65,31 @@ fn init(
                 ],
                 node[ui_assets.large_text(continue_text); Focusable::default(), Button::Restart],
                 node[ui_assets.large_text("Exit to desktop"); Focusable::default(), Button::ExitApp]
+            )
+        )
+    };
+
+    // TODO: this is copied from code above with few minor changes
+    #[cfg(target_arch = "wasm32")]
+    build_ui! {
+        #[cmd(commands)]
+        node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
+            node{ position_type: PositionType::Absolute, size: Size::new(Val::Percent(0.), Val::Percent(0.)) }[;
+                UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
+                MenuCursor::default(),
+                Name::new("Cursor")
+            ],
+            node{ position_type: PositionType::Absolute }[;
+                UiColor(Color::rgba(0., 0., 0., 0.7)),
+                Name::new("'Shadow'"),
+                style! { size: size!(100 pct, 100 pct), }
+            ],
+            node[; Name::new("Menu columns")](
+                node[
+                    ImageBundle { image, ..Default::default() };
+                    style! { size: size!(auto, 30 pct), }
+                ],
+                node[ui_assets.large_text(continue_text); Focusable::default(), Button::Restart]
             )
         )
     };
