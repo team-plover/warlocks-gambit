@@ -220,16 +220,16 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
     let music_slider = slider("Music", AudioChannel::Music, 50.0);
     build_ui! {
         #[cmd(cmds)]
-        node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
+        node{ min_size: size!(100 pct, 100 pct), flex_direction: FD::Column }[;Name::new("root node"), MenuRoot](
             node{ position_type: PT::Absolute }[;
                 UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
                 MenuCursor::default(),
                 Name::new("Cursor")
             ],
             entity[
-                image(&menu_assets.title_image);
-                Name::new("Title Image"),
-                style! { size: size!(auto, 30 pct), }
+                large_text(""); // I have no idea what I am doing, but it works
+                Name::new("End pacer"),
+                style! { size: size!(auto, 10 pct), }
             ],
             node{ flex_direction: FD::Row }[; Name::new("Menu columns")](
                 node[; Name::new("Menu node")](
@@ -255,6 +255,11 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center
             }[; UiColor(Color::rgb(0.1, 0.1, 0.1)), Name::new("Credits overlay"), CreditOverlay](
+                node[
+                    image(&menu_assets.title_image);
+                    Name::new("Title Image"),
+                    style! { size: size!(auto, 30 pct), }
+                ],
                 node[large_text("Lorithan, vasukas,");],
                 node[large_text("Gibonus, BLucky,");],
                 node[large_text("Xolotl, jpet,");],
