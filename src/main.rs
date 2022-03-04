@@ -98,7 +98,7 @@ fn main() {
             vsync: false, // workaround for https://github.com/bevyengine/bevy/issues/1908 (seems to be Mesa bug with X11 + Vulkan)
             ..Default::default()
         })
-        .add_state(GameState::MainMenu)
+        .add_state(GameState::ScenePreload)
         .add_state(TurnState::Starting)
         .add_plugins(DefaultPlugins);
 
@@ -125,7 +125,12 @@ fn main() {
         .add_plugin(card_effect::Plugin(GameState::Playing))
         .add_plugin(game_ui::Plugin(GameState::Playing))
         .add_system(first_draw.with_run_criteria(State::on_enter(GameState::Playing)))
-        .add_startup_system(setup);
+        .add_system_set(
+            SystemSet::on_exit(GameState::ScenePreload)
+                .with_system(setup)
+                .with_system(ui::common::exit_menu),
+        )
+        .add_startup_system(init_loading_message);
 
     app.run();
 }
@@ -136,6 +141,37 @@ fn setup(
 ) {
     *ambiant_light = AmbientLight { color: Color::WHITE, brightness: 1.0 };
     audio_events.send(audio::AudioRequest::StartMusic);
+}
+
+fn init_loading_message(mut commands: Commands, ui_assets: Res<ui::common::UiAssets>) {
+    use bevy::prelude::*;
+    use bevy_ui_build_macros::{build_ui, size, style, unit};
+    use ui::common::*;
+
+    let text = "Loading...";
+
+    //
+
+    let node = NodeBundle {
+        color: Color::NONE.into(),
+        style: style! {
+            flex_direction: FlexDirection::ColumnReverse,
+            align_items: AlignItems::Center,
+            align_self: AlignSelf::Center,
+
+            size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+            position_type: PositionType::Absolute,
+            justify_content: JustifyContent::Center,
+        },
+        ..Default::default()
+    };
+
+    build_ui! {
+        #[cmd(commands)]
+        node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
+            node[ui_assets.large_text(text);]
+        )
+    };
 }
 
 fn first_draw(

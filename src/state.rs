@@ -1,5 +1,6 @@
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub enum GameState {
+    ScenePreload,
     MainMenu,
     LoadScene,
     Playing,

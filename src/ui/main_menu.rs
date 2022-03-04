@@ -6,6 +6,7 @@ use bevy_ui_navigation::{Focusable, Focused, NavEvent, NavRequest};
 
 // TODO: wait until background scene is loaded (it should take less than second)
 
+use crate::scene::ScenePreload;
 use crate::{
     add_dbg_text,
     audio::{AudioChannel, AudioRequest, SfxParam},
@@ -218,6 +219,8 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
     let master_slider = slider("Master", AudioChannel::Master, 100.0);
     let sfx_slider = slider("Sfx", AudioChannel::Sfx, 50.0);
     let music_slider = slider("Music", AudioChannel::Music, 50.0);
+
+    #[cfg(not(target_arch = "wasm32"))]
     build_ui! {
         #[cmd(cmds)]
         node{ min_size: size!(100 pct, 100 pct), flex_direction: FD::Column }[;Name::new("root node"), MenuRoot](
@@ -245,7 +248,59 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
                 node[; Name::new("Graphics column")](
                     node[large_text("Lock mouse cursor"); focusable, LockMouse],
                     node[large_text("Toggle Full screen"); focusable, ToggleFullScreen],
-                    node[large_text("Make exactly 16:9"); focusable, Set16_9]
+                    node[large_text("Fit window to 16:9"); focusable, Set16_9]
+                )
+            ),
+            node{
+                position_type: PT::Absolute,
+                position: rect!(10 pct),
+                display: Display::None,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center
+            }[; UiColor(Color::rgb(0.1, 0.1, 0.1)), Name::new("Credits overlay"), CreditOverlay](
+                node[
+                    image(&menu_assets.title_image);
+                    Name::new("Title Image"),
+                    style! { size: size!(auto, 30 pct), }
+                ],
+                node[large_text("music, sfx: Samuel_sound");],
+                node[large_text("graphics: Xolotl");],
+                node[large_text("code, voices, design: Gibonus");],
+                node[large_text("more code: vasukas");],
+                node[large_text("thanks: BLucky (devops), Lorithan (game idea)");],
+                node[large_text("Also the BEVY community <3 <3 <3");],
+                node[text_bundle("(Click anywhere to exit)", 30.0);]
+            )
+        )
+    };
+
+    // TODO: this is copied from code above with few minor changes
+    #[cfg(target_arch = "wasm32")]
+    build_ui! {
+        #[cmd(cmds)]
+        node{ min_size: size!(100 pct, 100 pct), flex_direction: FD::Column }[;Name::new("root node"), MenuRoot](
+            node{ position_type: PT::Absolute, size: Size::new(Val::Percent(0.), Val::Percent(0.)) }[;
+                UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
+                MenuCursor::default(),
+                Name::new("Cursor")
+            ],
+            entity[
+                large_text(""); // I have no idea what I am doing, but it works
+                Name::new("End pacer"),
+                style! { size: size!(auto, 10 pct), }
+            ],
+            node{ flex_direction: FD::Row }[; Name::new("Menu columns")](
+                node[; Name::new("Menu node")](
+                    node[large_text("Start");   focusable, Name::new("Start button"), Start],
+                    node[large_text("Credits"); Focusable::lock(), Name::new("Credits button"), Credits]
+                ),
+                node{ align_items: AlignItems::FlexEnd, margin: rect!(50 px) }[; Name::new("Audio settings")](
+                    id(master_slider),
+                    id(music_slider),
+                    id(sfx_slider)
+                ),
+                node[; Name::new("Graphics column")](
+                    node[large_text("Toggle Full screen"); focusable, ToggleFullScreen]
                 )
             ),
             node{
@@ -272,20 +327,12 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
     };
 }
 
-#[derive(Default)]
-struct ScenePreload(Handle<Scene>);
-
-fn load_scene(mut preload: ResMut<ScenePreload>, asset_server: Res<AssetServer>) {
-    let scene = "scene_mainmenu.glb#Scene0";
-    preload.0 = asset_server.load(scene);
-}
-
 fn setup_scene(
     mut cmds: Commands,
     mut scene_spawner: ResMut<SceneSpawner>,
     preload: Res<ScenePreload>,
 ) {
-    let scene = preload.0.clone();
+    let scene = preload.main_menu.clone();
     let parent = cmds
         .spawn()
         .insert(MenuRoot)
@@ -301,7 +348,6 @@ impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
             .insert_resource(ScenePreload::default())
-            .add_startup_system(load_scene)
             .add_system_set(
                 SystemSet::on_enter(self.0)
                     .with_system(setup_main_menu)

@@ -18,9 +18,15 @@ fn init(
     kind: Res<GameOverKind>,
     images: Res<GameoverAssets>,
 ) {
+    #[cfg(not(target_arch = "wasm32"))]
     let continue_text = match *kind {
         GameOverKind::PlayerWon => "New game",
         GameOverKind::PlayerLost | GameOverKind::CheatSpotted => "Restart",
+    };
+    #[cfg(target_arch = "wasm32")]
+    let continue_text = match *kind {
+        GameOverKind::PlayerWon => "Press SPACE to start new game",
+        GameOverKind::PlayerLost | GameOverKind::CheatSpotted => "Press SPACE to restart",
     };
     let image = match *kind {
         GameOverKind::PlayerWon => images.victory.clone(),
@@ -44,6 +50,7 @@ fn init(
         ..Default::default()
     };
 
+    #[cfg(not(target_arch = "wasm32"))]
     build_ui! {
         #[cmd(commands)]
         node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
@@ -67,6 +74,31 @@ fn init(
             )
         )
     };
+
+    // TODO: this is copied from code above with few minor changes
+    #[cfg(target_arch = "wasm32")]
+    build_ui! {
+        #[cmd(commands)]
+        node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
+            node{ position_type: PositionType::Absolute, size: Size::new(Val::Percent(0.), Val::Percent(0.)) }[;
+                UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
+                MenuCursor::default(),
+                Name::new("Cursor")
+            ],
+            node{ position_type: PositionType::Absolute }[;
+                UiColor(Color::rgba(0., 0., 0., 0.7)),
+                Name::new("'Shadow'"),
+                style! { size: size!(100 pct, 100 pct), }
+            ],
+            node[; Name::new("Menu columns")](
+                node[
+                    ImageBundle { image, ..Default::default() };
+                    style! { size: size!(auto, 30 pct), }
+                ],
+                node[ui_assets.large_text(continue_text);]
+            )
+        )
+    };
 }
 
 fn update(
@@ -86,11 +118,22 @@ fn update(
     }
 }
 
+fn continue_on_space(mut keys: ResMut<Input<KeyCode>>, mut state: ResMut<State<GameState>>) {
+    if keys.just_pressed(KeyCode::Space) {
+        state.set(GameState::Playing).unwrap();
+        keys.reset(KeyCode::Space);
+    }
+}
+
 pub struct Plugin;
 impl bevy::app::Plugin for Plugin {
     fn build(&self, app: &mut App) {
         app.add_system_set(SystemSet::on_enter(GameState::RestartMenu).with_system(init));
         app.add_system_set(SystemSet::on_exit(GameState::RestartMenu).with_system(exit_menu));
-        app.add_system_set(SystemSet::on_update(GameState::RestartMenu).with_system(update));
+        app.add_system_set(
+            SystemSet::on_update(GameState::RestartMenu)
+                .with_system(update)
+                .with_system(continue_on_space),
+        );
     }
 }

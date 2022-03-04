@@ -46,7 +46,7 @@ impl FromWorld for UiAssets {
 
 fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
     let text = |content: &str| {
-        let color = Color::ANTIQUE_WHITE;
+        let color = Color::NAVY;
         let horizontal = HorizontalAlign::Left;
         let style = TextStyle {
             color,
