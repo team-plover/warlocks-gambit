@@ -6,7 +6,7 @@ on:
       - '*'
 
 env:
-  binary: jambevy
+  binary: warlocks-gambit
 
 
 jobs:
