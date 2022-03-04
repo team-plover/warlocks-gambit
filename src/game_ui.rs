@@ -122,8 +122,11 @@ fn despawn_game_ui(mut cmds: Commands, query: Query<Entity, With<UiRoot>>) {
     cmds.entity(query.single()).despawn_recursive();
 }
 
+#[derive(PartialEq)]
 pub enum EffectEvent {
     Show(WordOfPower),
+    UseSeed,
+    EndCheat,
 }
 
 /// Show effect description on screen
@@ -131,7 +134,7 @@ pub enum EffectEvent {
 /// NOTE: to remove it, you need to set the `timeout` to lower than current time
 #[derive(Default)]
 struct EffectDisplay {
-    word: Option<WordOfPower>,
+    showing: bool,
     timeout: f64,
 }
 
@@ -141,14 +144,14 @@ fn hide_effects(
     mut image: Query<&mut Visibility, With<CardEffectImage>>,
     mut description: Query<&mut Text, With<CardEffectDescription>>,
 ) {
-    if display.word.is_some() && display.timeout <= time.seconds_since_startup() {
+    if display.showing && display.timeout <= time.seconds_since_startup() {
         if let Ok(mut img) = image.get_single_mut() {
             img.is_visible = false;
         }
         if let Ok(mut txt) = description.get_single_mut() {
             txt.sections[0].value.clear();
         }
-        display.word = None;
+        display.showing = false;
     }
 }
 
@@ -162,11 +165,26 @@ fn handle_effect_events(
 ) {
     for event in events.iter() {
         match event {
+            EffectEvent::UseSeed | EffectEvent::EndCheat => {
+                display.showing = true;
+                display.timeout = time.seconds_since_startup() + 1.5;
+                let txt_box = &mut description.single_mut().sections[0];
+                txt_box.style.color = Color::ANTIQUE_WHITE;
+                txt_box.style.font_size = 50.0;
+                txt_box.value.clear();
+                let text = match event {
+                    EffectEvent::UseSeed => "Used seed, now is the time to cheat!",
+                    EffectEvent::EndCheat => "The bird is watching again!",
+                    EffectEvent::Show(_) => "BUGBUGBUG D:",
+                };
+                write!(txt_box.value, "{}", text).unwrap();
+            }
             EffectEvent::Show(word) => {
-                display.word = Some(*word);
+                display.showing = true;
                 display.timeout = time.seconds_since_startup() + 1.5;
                 let txt_box = &mut description.single_mut().sections[0];
                 txt_box.style.color = word.color();
+                txt_box.style.font_size = 60.0;
                 txt_box.value.clear();
                 write!(txt_box.value, "{}", word.flavor_text()).unwrap();
                 let (mut img, mut visibility) = image.single_mut();

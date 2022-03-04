@@ -69,6 +69,15 @@ impl SeedCount {
     pub fn count(&self) -> usize {
         self.0
     }
+    /// True if can use a seed (consuming it)
+    pub fn consume(&mut self) -> bool {
+        if self.0 != 0 {
+            self.0 -= 1;
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Default)]

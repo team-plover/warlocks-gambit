@@ -8,7 +8,6 @@ mod cheat;
 #[cfg(feature = "debug")] // only include if compiling in debug mode
 mod debug_overlay;
 mod deck;
-mod detection;
 mod game_ui;
 mod gltf_hook;
 mod oppo_hand;
@@ -95,8 +94,7 @@ fn main() {
         .add_plugin(scene::Plugin(GameState::LoadScene))
         .add_plugin(deck::Plugin(GameState::Playing))
         .add_plugin(animate::Plugin)
-        .add_plugin(detection::Plugin)
-        .add_plugin(cheat::Plugin)
+        .add_plugin(cheat::Plugin(GameState::Playing))
         .add_plugin(audio::Plugin)
         .add_plugin(card::Plugin)
         .add_plugin(ui::common::Plugin)

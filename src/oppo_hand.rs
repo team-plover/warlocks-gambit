@@ -64,9 +64,6 @@ fn chose_card(
 ) {
     use BattleOutcome::{Loss, Win};
     use WordOfPower::Zihbm;
-    // use PileType::War;
-    // let pile = pile.iter().find(|p| p.which == War).expect("War pile exists");
-    // TODO: use an actual heuristic instead of picking first at all time
     let in_hand: Vec<_> = cards.iter().collect();
     let selected = match war_card.get_single() {
         Ok(war_card) => {
