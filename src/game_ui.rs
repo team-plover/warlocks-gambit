@@ -122,6 +122,9 @@ pub enum EffectEvent {
     Show(WordOfPower),
     UseSeed,
     EndCheat,
+    TutoGetSeed,
+    TutoUseSeed,
+    TutoSleeve,
 }
 
 /// Show effect description on screen
@@ -158,23 +161,39 @@ fn handle_effect_events(
     ui_assets: Res<UiAssets>,
     time: Res<Time>,
 ) {
+    use EffectEvent::*;
     for event in events.iter() {
         match event {
-            EffectEvent::UseSeed | EffectEvent::EndCheat => {
+            TutoGetSeed | TutoUseSeed | TutoSleeve => {
                 display.showing = true;
-                display.timeout = time.seconds_since_startup() + 1.5;
+                display.timeout = time.seconds_since_startup() + 5.0;
+                let txt_box = &mut description.single_mut().sections[0];
+                txt_box.style.color = Color::ORANGE_RED;
+                txt_box.style.font_size = 70.0;
+                txt_box.value.clear();
+                let text = match event {
+                    TutoUseSeed => "A seed! Perfect to distract the bird\nPress space bar to use your seed",
+                    TutoGetSeed => "This is unfair! The deck is stacked!\nOnly way out is cheating\nBut how? The bird is watching...",
+                    TutoSleeve => "Now that the bird can't see you,\ngrab a card and slip it into your sleeve!",
+                    Show(_) | UseSeed | EndCheat => "BUGBUGBUG D:",
+                };
+                write!(txt_box.value, "{}", text).unwrap();
+            }
+            UseSeed | EndCheat => {
+                display.showing = true;
+                display.timeout = time.seconds_since_startup() + 3.0;
                 let txt_box = &mut description.single_mut().sections[0];
                 txt_box.style.color = Color::ANTIQUE_WHITE;
                 txt_box.style.font_size = 50.0;
                 txt_box.value.clear();
                 let text = match event {
-                    EffectEvent::UseSeed => "Used seed, now is the time to cheat!",
-                    EffectEvent::EndCheat => "The bird is watching again!",
-                    EffectEvent::Show(_) => "BUGBUGBUG D:",
+                    UseSeed => "Used seed, now is the time to cheat!",
+                    EndCheat => "The bird is watching again!",
+                    Show(_) | TutoUseSeed | TutoSleeve | TutoGetSeed => "BUGBUGBUG D:",
                 };
                 write!(txt_box.value, "{}", text).unwrap();
             }
-            EffectEvent::Show(word) => {
+            Show(word) => {
                 display.showing = true;
                 display.timeout = time.seconds_since_startup() + 1.5;
                 let txt_box = &mut description.single_mut().sections[0];

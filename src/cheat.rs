@@ -5,7 +5,7 @@ use crate::add_dbg_text;
 use crate::{
     animate::Animated,
     card_effect::SeedCount,
-    card_spawner::{BirdPupil, BirdPupilRoot, GrabbedCard, PlayerSleeve},
+    card_spawner::{BirdPupil, BirdPupilRoot, GameStarts, GrabbedCard, PlayerSleeve},
     game_ui::EffectEvent,
     state::GameState,
     ui::gameover::GameOverKind,
@@ -68,6 +68,7 @@ fn control_bird_pupil(
 
 fn execute_cheat(
     sleeve: Query<&GlobalTransform, With<PlayerSleeve>>,
+    game_starts: Res<GameStarts>,
     mut bird_eye: Query<&mut Animated, With<BirdPupilRoot>>,
     mut gameover_events: EventWriter<GameOverKind>,
     mut ui: EventWriter<EffectEvent>,
@@ -81,6 +82,9 @@ fn execute_cheat(
                 watch.is_watching = false;
                 if let Ok(mut anim) = bird_eye.get_single_mut() {
                     *anim = Animated::Circle { radius: 0.1, period: 1.0, offset: 0.0 };
+                }
+                if game_starts.0 == 2 {
+                    ui.send(EffectEvent::TutoSleeve);
                 }
             }
             CheatEvent::HideInSleeve(_) if watch.is_watching => {

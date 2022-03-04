@@ -8,7 +8,7 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use crate::{
     audio::AudioRequest,
     card::{Card, WordOfPower},
-    card_spawner::{CardOrigin, PlayedCard},
+    card_spawner::{CardOrigin, GameStarts, PlayedCard},
     cheat::SleeveCard,
     deck::{OppoDeck, PlayerDeck},
     game_ui::EffectEvent,
@@ -92,6 +92,7 @@ fn handle_activated(
     mut turn_effects: ResMut<TurnEffects>,
     mut seed_count: ResMut<SeedCount>,
     mut audio_events: EventWriter<AudioRequest>,
+    game_starts: Res<GameStarts>,
     cards: Query<&Card>,
 ) {
     use PileType::War;
@@ -111,7 +112,12 @@ fn handle_activated(
             audio_events.send(AudioRequest::PlayWord(word));
         }
         match card_word {
-            Ok(Some(Egeq)) => seed_count.0 += 1,
+            Ok(Some(Egeq)) => {
+                if game_starts.0 == 2 {
+                    ui_events.send(EffectEvent::TutoUseSeed);
+                }
+                seed_count.0 += 1;
+            }
             Ok(Some(Qube)) => turn_effects.effect = Some(Effect::DoublePoints),
             Ok(Some(Zihbm)) => turn_effects.effect = Some(Effect::InvertValues),
             Ok(Some(Geh)) => turn_effects.effect = Some(Effect::ZeroBonus),

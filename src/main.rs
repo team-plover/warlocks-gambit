@@ -35,6 +35,9 @@ mod card_spawner {
     use super::Participant;
     use bevy::prelude::Component;
 
+    #[derive(Default)]
+    pub struct GameStarts(pub u32);
+
     #[derive(Component)]
     pub struct GrabbedCard;
 
@@ -98,6 +101,7 @@ fn main() {
         .add_plugin(debug_overlay::Plugin);
 
     app.insert_resource(ClearColor(Color::rgb(0.293, 0.3828, 0.4023)))
+        .init_resource::<card_spawner::GameStarts>()
         .add_plugin(player_hand::Plugin(GameState::Playing))
         .add_plugin(oppo_hand::Plugin(GameState::Playing))
         .add_plugin(scene::Plugin(GameState::LoadScene))
@@ -127,6 +131,14 @@ fn setup(
     audio_events.send(audio::AudioRequest::StartMusic);
 }
 
-fn first_draw(mut state: ResMut<State<TurnState>>) {
+fn first_draw(
+    mut starts: ResMut<card_spawner::GameStarts>,
+    mut game_msgs: EventWriter<game_ui::EffectEvent>,
+    mut state: ResMut<State<TurnState>>,
+) {
+    if starts.0 == 1 {
+        game_msgs.send(game_ui::EffectEvent::TutoGetSeed);
+    }
+    starts.0 += 1;
     state.set(TurnState::Draw).unwrap();
 }
