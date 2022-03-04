@@ -54,11 +54,13 @@ fn control_bird_pupil(
     if eye_status.is_watching {
         match (grabbed_card.get_single(), eye.get_single_mut()) {
             (Ok(look_at), Ok(mut eye)) => {
+                add_dbg_text!("Tracking player card", 0.1);
                 let hand = look_at.translation;
                 let new_trans = Vec3::new(hand.x / 2.7, (hand.y - 6.05) / 1.65, 0.0) * 0.1;
                 eye.translation = new_trans;
             }
             (Err(_), Ok(mut eye)) => {
+                add_dbg_text!("Not tracking player card", 0.1);
                 eye.translation = Vec3::ZERO;
             }
             _ => {}
@@ -99,6 +101,7 @@ fn execute_cheat(
                 if let Ok(mut anim) = bird_eye.get_single_mut() {
                     *anim = Animated::Static;
                 }
+                watch.is_watching = true;
                 ui.send(EffectEvent::EndCheat);
                 cmds.entity(*entity)
                     .insert(SleeveCard)
