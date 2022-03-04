@@ -18,9 +18,15 @@ fn init(
     kind: Res<GameOverKind>,
     images: Res<GameoverAssets>,
 ) {
+    #[cfg(not(target_arch = "wasm32"))]
     let continue_text = match *kind {
         GameOverKind::PlayerWon => "New game",
         GameOverKind::PlayerLost | GameOverKind::CheatSpotted => "Restart",
+    };
+    #[cfg(target_arch = "wasm32")]
+    let continue_text = match *kind {
+        GameOverKind::PlayerWon => "Press SPACE to start new game",
+        GameOverKind::PlayerLost | GameOverKind::CheatSpotted => "Press SPACE to restart",
     };
     let image = match *kind {
         GameOverKind::PlayerWon => images.victory.clone(),
@@ -89,7 +95,7 @@ fn init(
                     ImageBundle { image, ..Default::default() };
                     style! { size: size!(auto, 30 pct), }
                 ],
-                node[ui_assets.large_text(continue_text); Focusable::default(), Button::Restart]
+                node[ui_assets.large_text(continue_text);]
             )
         )
     };
@@ -112,11 +118,22 @@ fn update(
     }
 }
 
+fn continue_on_space(mut keys: ResMut<Input<KeyCode>>, mut state: ResMut<State<GameState>>) {
+    if keys.just_pressed(KeyCode::Space) {
+        state.set(GameState::Playing).unwrap();
+        keys.reset(KeyCode::Space);
+    }
+}
+
 pub struct Plugin;
 impl bevy::app::Plugin for Plugin {
     fn build(&self, app: &mut App) {
         app.add_system_set(SystemSet::on_enter(GameState::RestartMenu).with_system(init));
         app.add_system_set(SystemSet::on_exit(GameState::RestartMenu).with_system(exit_menu));
-        app.add_system_set(SystemSet::on_update(GameState::RestartMenu).with_system(update));
+        app.add_system_set(
+            SystemSet::on_update(GameState::RestartMenu)
+                .with_system(update)
+                .with_system(continue_on_space),
+        );
     }
 }
