@@ -47,7 +47,6 @@ impl GltfHook for Scene {
     }
 }
 
-
 #[derive(Default)]
 pub struct ScenePreload {
     pub game: Handle<bevy::prelude::Scene>,
