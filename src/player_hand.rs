@@ -188,6 +188,8 @@ fn play_card(
     }
 }
 
+// TODO: tilt hand backward when enemy is playing so that it's more explicitly
+// the player's turn
 // TODO: animate sleeve movement
 fn update_sleeve(
     mut cmds: Commands,

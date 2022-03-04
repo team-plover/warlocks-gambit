@@ -24,11 +24,11 @@ use crate::{
 #[derive(Enum, Clone, Copy, Debug)]
 pub enum WordOfPower {
     Egeq,
+    Qube,
+    Zihbm,
     Geh,
     Het,
     Meb,
-    Qube,
-    Zihbm,
 }
 impl WordOfPower {
     pub fn color(self) -> Color {
@@ -40,6 +40,16 @@ impl WordOfPower {
             Meb => Color::GRAY,
             Qube => Color::GOLD,
             Zihbm => Color::PINK,
+        }
+    }
+    pub fn flavor_text(&self) -> &'static str {
+        use WordOfPower::*;
+        match self {
+            Egeq => "Gain a seed",
+            Qube => "Double points",
+            Zihbm => "Swap winners",
+            Geh => "Zero earns 12",
+            _ => "Unimplemented",
         }
     }
 }
@@ -65,6 +75,17 @@ impl Card {
     }
     pub fn set_status(&mut self, status: CardStatus) {
         self.status = status;
+    }
+    pub fn max_value(&self) -> i32 {
+        let value = self.value as i32;
+        let word_max_bonus = match self.word {
+            // Zero = 12
+            Some(WordOfPower::Geh) => 12,
+            // Double card value (including opponent's)
+            Some(WordOfPower::Qube) => value + 9,
+            _ => 0,
+        };
+        word_max_bonus + value
     }
 }
 

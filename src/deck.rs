@@ -22,15 +22,15 @@ impl Deck {
     fn remaining(&self) -> usize {
         self.cards.len()
     }
-    fn score(&self) -> u32 {
-        self.cards.iter().map(|c| c.value as u32).sum()
+    fn score(&self) -> i32 {
+        self.cards.iter().map(Card::max_value).sum()
     }
 }
 
 macro_rules! impl_deck_methods {
     ($what:ident) => (
         impl $what {
-            impl_deck_methods!(@method score((&)) -> u32);
+            impl_deck_methods!(@method score((&)) -> i32);
             impl_deck_methods!(@method draw((&mut), count: usize) -> Vec<Card>);
             impl_deck_methods!(@method remaining((&)) -> usize);
         }
@@ -60,8 +60,8 @@ impl PlayerDeck {
     #[rustfmt::skip]
     fn new() -> Self {
         Self(cards![
-            Zero Egeq  | One None   | Two None  |
-            Three Egeq | Four Egeq  | Five None |
+            Zero Egeq  | One Qube   | Two Zihbm |
+            Zero Geh   | Four Egeq  | Five None |
             Zero None  | Three None | Two Geh   |
         ])
     }

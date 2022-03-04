@@ -5,10 +5,7 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_ui_build_macros::{build_ui, size, style, unit};
 
 use crate::{
-    card::Card,
-    card_effect::TurnCount,
-    deck::{OppoDeck, PlayerDeck},
-    pile::{PileCard, PileType},
+    card_effect::{CardStats, SeedCount, TurnCount},
     state::{GameState, TurnState},
 };
 
@@ -17,6 +14,7 @@ struct UiRoot;
 
 #[derive(Component, Clone)]
 enum UiInfo {
+    Seeds,
     Playing,
     Turns,
     PlayerScore,
@@ -65,6 +63,10 @@ fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
             display: Display::Flex,
             align_items: AlignItems::FlexEnd
         }[;Name::new("game ui root node"), UiRoot](
+            node{ flex_direction: FD::Row }[; Name::new("Seeds")](
+                node[text("Seeds: ");],
+                node[text("0"); UiInfo::Seeds]
+            ),
             node{ flex_direction: FD::Row }[; Name::new("Playing")](
                 node[text("Turn: ");],
                 node[text("Player"); UiInfo::Playing]
@@ -95,23 +97,22 @@ fn despawn_game_ui(mut cmds: Commands, query: Query<Entity, With<UiRoot>>) {
 
 fn update_game_ui(
     mut ui_infos: Query<(&mut Text, &UiInfo)>,
-    piles: Query<(&PileCard, &Card)>,
     turn_state: Res<State<TurnState>>,
     turn_counter: Res<TurnCount>,
-    oppo_deck: Res<OppoDeck>,
-    player_deck: Res<PlayerDeck>,
+    player_seeds: Res<SeedCount>,
+    stats: CardStats,
 ) {
-    let scores = |(pile, card): (&PileCard, &Card)| match pile.which {
-        PileType::Player => (card.value as u32, 0),
-        PileType::Oppo => (0, card.value as u32),
-        PileType::War => (0, 0),
-    };
-    let add_tuples = |(t1_1, t1_2), (t2_1, t2_2)| (t1_1 + t2_1, t1_2 + t2_2);
-    let (player_score, oppo_score) = piles.iter().map(scores).fold((0, 0), add_tuples);
+    let player_score = stats.player_score();
+    let oppo_score = stats.oppo_score();
+    let total_cards = stats.cards_remaining();
     for (mut text, ui_info) in ui_infos.iter_mut() {
         let txt = &mut text.sections[0].value;
         txt.clear();
         match ui_info {
+            UiInfo::Seeds => {
+                let seeds = player_seeds.count();
+                write!(txt, "{seeds}").unwrap();
+            }
             UiInfo::Playing => {
                 let turn = turn_state.current();
                 write!(txt, "{turn:?}").unwrap();
@@ -123,7 +124,6 @@ fn update_game_ui(
                 write!(txt, "{player_score}").unwrap();
             }
             UiInfo::CardsLeft => {
-                let total_cards = oppo_deck.remaining() + player_deck.remaining();
                 write!(txt, "{total_cards}").unwrap();
             }
             UiInfo::Turns => {

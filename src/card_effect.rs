@@ -6,14 +6,14 @@ use bevy::ecs::system::SystemParam;
 use bevy::prelude::{Plugin as BevyPlugin, *};
 
 use crate::{
-    card::Card,
+    card::{Card, WordOfPower},
     card_spawner::CardOrigin,
     cheat::SleeveCard,
     deck::{OppoDeck, PlayerDeck},
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
     ui::gameover::GameOverKind,
-    war::BattleOutcome,
+    war::{BattleOutcome, Value},
     Participant,
 };
 
@@ -37,6 +37,38 @@ impl ActivateCard {
     }
 }
 
+enum Effect {
+    DoublePoints,
+    InvertValues,
+    ZeroBonus,
+}
+#[derive(Default)]
+struct TurnEffects {
+    effect: Option<Effect>,
+}
+
+#[derive(Default)]
+pub struct ScoreBonuses {
+    player: i32,
+    oppo: i32,
+}
+impl ScoreBonuses {
+    fn add_to_owner(&mut self, who: Participant, value: i32) {
+        match who {
+            Participant::Oppo => self.oppo += value,
+            Participant::Player => self.player += value,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct SeedCount(usize);
+impl SeedCount {
+    pub fn count(&self) -> usize {
+        self.0
+    }
+}
+
 #[derive(Default)]
 pub struct TurnCount(pub usize);
 
@@ -45,15 +77,25 @@ fn handle_activated(
     mut cmds: Commands,
     mut pile: Query<&mut Pile>,
     mut turn: ResMut<State<TurnState>>,
+    mut turn_effects: ResMut<TurnEffects>,
+    mut seed_count: ResMut<SeedCount>,
+    cards: Query<&Card>,
 ) {
     use PileType::War;
+    use WordOfPower::*;
     for ActivateCard { card, who } in events.iter() {
         let mut pile = pile
             .iter_mut()
             .find(|p| p.which == War)
             .expect("War pile exists");
         cmds.entity(*card).insert(pile.additional_card());
-
+        match cards.get(*card).map(|c| c.word) {
+            Ok(Some(Egeq)) => seed_count.0 += 1,
+            Ok(Some(Qube)) => turn_effects.effect = Some(Effect::DoublePoints),
+            Ok(Some(Zihbm)) => turn_effects.effect = Some(Effect::InvertValues),
+            Ok(Some(Geh)) => turn_effects.effect = Some(Effect::ZeroBonus),
+            _ => {}
+        }
         let new_state = match who {
             Participant::Oppo => TurnState::OppoActivated,
             Participant::Player => TurnState::PlayerActivated,
@@ -67,13 +109,26 @@ fn handle_turn_end(
     mut piles: Query<&mut Pile>,
     mut turn: ResMut<State<TurnState>>,
     mut cmds: Commands,
+    mut turn_effects: ResMut<TurnEffects>,
+    mut score_bonuses: ResMut<ScoreBonuses>,
 ) {
-    use PileType::{Oppo, Player, War};
+    use Participant::{Oppo, Player};
+    use PileType::War;
     let war_pile: Vec<_> = cards.iter().filter(|c| c.0.which == War).collect();
     macro_rules! add_card_to_pile {
-        ($entity:expr, $pile_type:expr) => {
-            let mut pile = piles.iter_mut().find(|p| p.which == $pile_type).unwrap();
-            cmds.entity($entity).insert(pile.additional_card());
+        ($entry:expr, $who:expr) => {
+            let (_, _, card, entity) = $entry;
+            let mut pile = piles.iter_mut().find(|p| p.which == $who.into()).unwrap();
+            cmds.entity(*entity).insert(pile.additional_card());
+            match turn_effects.effect {
+                Some(Effect::DoublePoints) => {
+                    score_bonuses.add_to_owner($who, card.value as i32);
+                }
+                Some(Effect::ZeroBonus) if card.value == Value::Zero => {
+                    score_bonuses.add_to_owner($who, 12);
+                }
+                _ => {}
+            }
         };
     }
     match &war_pile[..] {
@@ -83,20 +138,25 @@ fn handle_turn_end(
             } else {
                 (card2, card1)
             };
-            match player_card.2.value.beats(&oppo_card.2.value) {
+            let mut turn_outcome = player_card.2.value.beats(&oppo_card.2.value);
+            if matches!(turn_effects.effect, Some(Effect::InvertValues)) {
+                turn_outcome = turn_outcome.invert();
+            };
+            match turn_outcome {
                 BattleOutcome::Tie => {
-                    add_card_to_pile!(player_card.3, Player);
-                    add_card_to_pile!(oppo_card.3, Oppo);
+                    add_card_to_pile!(player_card, Player);
+                    add_card_to_pile!(oppo_card, Oppo);
                 }
                 BattleOutcome::Loss => {
-                    add_card_to_pile!(player_card.3, Oppo);
-                    add_card_to_pile!(oppo_card.3, Oppo);
+                    add_card_to_pile!(player_card, Oppo);
+                    add_card_to_pile!(oppo_card, Oppo);
                 }
                 BattleOutcome::Win => {
-                    add_card_to_pile!(player_card.3, Player);
-                    add_card_to_pile!(oppo_card.3, Player);
+                    add_card_to_pile!(player_card, Player);
+                    add_card_to_pile!(oppo_card, Player);
                 }
             }
+            turn_effects.effect = None;
             let err_msg = "handle_turn_end only activated when in '*Activated' state";
             turn.set(TurnState::New).expect(err_msg);
         }
@@ -110,6 +170,44 @@ fn handle_turn_end(
 // Sets of cards that are not in piles (aka: in hand)
 type HandFilter = (With<CardOrigin>, Without<PileCard>, Without<SleeveCard>);
 
+#[derive(SystemParam)]
+pub struct CardStats<'w, 's> {
+    piles: Query<'w, 's, (&'static PileCard, &'static Card)>,
+    hands: Query<'w, 's, &'static Card, HandFilter>,
+    sleeve: Query<'w, 's, &'static Card, With<SleeveCard>>,
+    player_deck: Res<'w, PlayerDeck>,
+    oppo_deck: Res<'w, OppoDeck>,
+    score_bonuses: Res<'w, ScoreBonuses>,
+}
+impl<'w, 's> CardStats<'w, 's> {
+    pub fn remaining_score(&self) -> i32 {
+        let hands_score: i32 = self.hands.iter().map(Card::max_value).sum();
+        let sleeve_score: i32 = self.sleeve.iter().map(Card::max_value).sum();
+        self.player_deck.score() + self.oppo_deck.score() + sleeve_score + hands_score
+    }
+    pub fn player_score(&self) -> i32 {
+        use PileType::Player;
+        let player_score: i32 = self
+            .piles
+            .iter()
+            .filter_map(|(p, c)| matches!(p.which, Player).then(|| c.value as i32))
+            .sum();
+        player_score + self.score_bonuses.player
+    }
+    pub fn oppo_score(&self) -> i32 {
+        use PileType::Oppo;
+        let oppo_score: i32 = self
+            .piles
+            .iter()
+            .filter_map(|(p, c)| matches!(p.which, Oppo).then(|| c.value as i32))
+            .sum();
+        oppo_score + self.score_bonuses.oppo
+    }
+    pub fn cards_remaining(&self) -> usize {
+        self.oppo_deck.remaining()
+    }
+}
+
 #[allow(clippy::type_complexity)]
 fn handle_new_turn(
     mut initative: ResMut<Initiative>,
@@ -117,22 +215,15 @@ fn handle_new_turn(
     mut turn_count: ResMut<TurnCount>,
     mut gameover_events: EventWriter<GameOverKind>,
     hands: Query<(), HandFilter>,
-    player_deck: Res<PlayerDeck>,
-    oppo_deck: Res<OppoDeck>,
-    piles: Query<(&PileCard, &Card)>,
+    card_stats: CardStats,
 ) {
-    let remaining_scores = player_deck.score() + oppo_deck.score();
-    let scores = |(pile, card): (&PileCard, &Card)| match pile.which {
-        PileType::Player => (card.value as i32, 0),
-        PileType::Oppo => (0, card.value as i32),
-        PileType::War => (0, 0),
-    };
-    let add_tuples = |(t1_1, t1_2), (t2_1, t2_2)| (t1_1 + t2_1, t1_2 + t2_2);
-    let (player_score, oppo_score) = piles.iter().map(scores).fold((0, 0), add_tuples);
-    if player_score - oppo_score > remaining_scores as i32 {
+    let player_score = card_stats.player_score();
+    let oppo_score = card_stats.oppo_score();
+    let remaining_scores = card_stats.remaining_score();
+    if player_score - oppo_score > remaining_scores {
         gameover_events.send(GameOverKind::PlayerWon);
         return;
-    } else if oppo_score - player_score > remaining_scores as i32 {
+    } else if oppo_score - player_score > remaining_scores {
         gameover_events.send(GameOverKind::PlayerLost);
         return;
     }
@@ -168,7 +259,6 @@ struct ActiveParams<'w, 's> {
     timeout: Local<'s, Option<f64>>,
 }
 
-// TODO: handle Word effects
 fn handle_generic_active(goes_into: TurnState, mut params: ActiveParams) {
     const TURN_INTERLUDE: f64 = 0.5;
     match *params.timeout {
@@ -196,9 +286,15 @@ fn cleanup(
     all_cards: Query<Entity, With<Card>>,
     mut turn_count: ResMut<TurnCount>,
     mut initative: ResMut<Initiative>,
+    mut score_bonuses: ResMut<ScoreBonuses>,
+    mut turn_effects: ResMut<TurnEffects>,
+    mut seed_count: ResMut<SeedCount>,
 ) {
     turn_count.0 = 0;
     initative.0 = Participant::Player;
+    *score_bonuses = ScoreBonuses::default();
+    *turn_effects = TurnEffects::default();
+    *seed_count = SeedCount::default();
     for entity in all_cards.iter() {
         cmds.entity(entity).despawn_recursive();
     }
@@ -211,6 +307,9 @@ impl BevyPlugin for Plugin {
         let handle_new_turn = handle_new_turn.before("check_gameover");
         app.add_event::<ActivateCard>()
             .init_resource::<TurnCount>()
+            .init_resource::<ScoreBonuses>()
+            .init_resource::<TurnEffects>()
+            .init_resource::<SeedCount>()
             .insert_resource(Initiative(Participant::Player))
             .add_system_set(SystemSet::on_update(self.0).with_system(handle_activated))
             .add_system_set(SystemSet::on_enter(TurnState::New).with_system(handle_new_turn))
