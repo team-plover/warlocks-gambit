@@ -5,8 +5,7 @@ use bevy::prelude::*;
 // To enter game over screen send GameOverKind via EventWriter.
 // Upon entering screen animation is played, when it goes to RestartMenu.
 
-// TODO: actual, non-placeholder animation
-// TODO: normal game screen should be drawn when GameOver state is active
+// TODO: add animation
 
 #[derive(Clone, Copy, Debug)]
 pub enum GameOverKind {
@@ -113,6 +112,7 @@ fn cleanup(root: Query<Entity, With<SceneRoot>>, mut commands: Commands) {
 #[derive(Default)]
 struct StartTime(f64); // seconds since startup
 
+#[allow(unused)]
 fn animation(
     kind: Res<GameOverKind>,
     start_time: Res<StartTime>,
@@ -129,58 +129,7 @@ fn animation(
     };
     let seconds_passed = (time.seconds_since_startup() - start_time.0) as f32;
 
-    match *kind {
-        GameOverKind::PlayerWon => {
-            let arm_raise_time = 2.;
-            let arm_hold_time = 1.;
-            let arm_lower_time = 1.;
-
-            if seconds_passed < arm_raise_time {
-                let t = seconds_passed / arm_raise_time;
-
-                if let Some(entities) = get_animatables(GameOverAnimation::DemonArmOppo) {
-                    for entity in entities {
-                        if let Ok((mut visible, mut transform)) = animatable.get_mut(entity) {
-                            visible.is_visible = true;
-                            //transform.translation.y = t * -200.;
-                        }
-                    }
-                }
-            } else if seconds_passed < arm_raise_time + arm_hold_time {
-                let _t = (seconds_passed - arm_raise_time) / arm_hold_time;
-
-                // replace head with skull
-                if let Some(entities) = get_animatables(GameOverAnimation::Head) {
-                    for entity in entities {
-                        if let Ok((mut visible, _)) = animatable.get_mut(entity) {
-                            visible.is_visible = false;
-                        }
-                    }
-                }
-                if let Some(entities) = get_animatables(GameOverAnimation::Skull) {
-                    for entity in entities {
-                        if let Ok((mut visible, _)) = animatable.get_mut(entity) {
-                            visible.is_visible = true;
-                        }
-                    }
-                }
-            } else if seconds_passed < arm_raise_time + arm_hold_time + arm_lower_time {
-                let t = (seconds_passed - arm_raise_time - arm_hold_time) / arm_lower_time;
-
-                if let Some(entities) = get_animatables(GameOverAnimation::DemonArmOppo) {
-                    for entity in entities {
-                        if let Ok((mut _visible, mut transform)) = animatable.get_mut(entity) {
-                            transform.translation.y = (1. - t) * -200.;
-                        }
-                    }
-                }
-            } else {
-                state.set(GameState::RestartMenu).unwrap()
-            }
-        }
-        GameOverKind::PlayerLost => todo!(),
-        GameOverKind::CheatSpotted => todo!(),
-    }
+    state.set(GameState::RestartMenu).unwrap();
 }
 
 //
