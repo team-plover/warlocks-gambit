@@ -245,9 +245,6 @@ impl<'w, 's> CardStats<'w, 's> {
             .sum();
         oppo_score + self.score_bonuses.oppo
     }
-    pub fn cards_remaining(&self) -> usize {
-        self.oppo_deck.remaining()
-    }
 }
 
 #[allow(clippy::type_complexity)]

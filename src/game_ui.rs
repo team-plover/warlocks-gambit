@@ -9,7 +9,7 @@ use crate::add_dbg_text;
 use crate::{
     card::WordOfPower,
     card_effect::{CardStats, SeedCount},
-    state::{GameState, TurnState},
+    state::GameState,
 };
 
 #[derive(Component, Clone)]
@@ -24,10 +24,10 @@ struct CardEffectImage;
 #[derive(Component, Clone)]
 enum UiInfo {
     Seeds,
-    Playing,
+    // Playing,
     PlayerScore,
     OppoScore,
-    CardsLeft,
+    // CardsLeft,
 }
 
 struct UiAssets {
@@ -93,10 +93,10 @@ fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
                     node[text("Seeds: ");],
                     node[text("0"); UiInfo::Seeds]
                 ),
-                node[; Name::new("Playing")](
-                    node[text("Turn: ");],
-                    node[text("Player"); UiInfo::Playing]
-                ),
+                // node[; Name::new("Playing")](
+                //     node[text("Turn: ");],
+                //     node[text("Player"); UiInfo::Playing]
+                // ),
                 node[; Name::new("Player score")](
                     node[text("Player: ");],
                     node[text("0"); UiInfo::PlayerScore]
@@ -104,11 +104,11 @@ fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
                 node[; Name::new("Oppo score")](
                     node[text("Oppo: ");],
                     node[text("0"); UiInfo::OppoScore]
-                ),
-                node[; Name::new("Cards remaining")](
-                    node[text("Cards remaining: ");],
-                    node[text("60"); UiInfo::CardsLeft]
                 )
+                // node[; Name::new("Cards remaining")](
+                //     node[text("Cards remaining: ");],
+                //     node[text("60"); UiInfo::CardsLeft]
+                // )
             )
         )
     };
@@ -212,14 +212,14 @@ fn handle_effect_events(
 
 fn update_game_ui(
     mut ui_infos: Query<(&mut Text, &UiInfo)>,
-    turn_state: Res<State<TurnState>>,
+    // turn_state: Res<State<TurnState>>,
     player_seeds: Res<SeedCount>,
     stats: CardStats,
 ) {
     add_dbg_text!(&format!("values left: {}", stats.remaining_score()), 0.1);
     let player_score = stats.player_score();
     let oppo_score = stats.oppo_score();
-    let total_cards = stats.cards_remaining();
+    // let total_cards = stats.cards_remaining();
     for (mut text, ui_info) in ui_infos.iter_mut() {
         let txt = &mut text.sections[0].value;
         txt.clear();
@@ -228,19 +228,18 @@ fn update_game_ui(
                 let seeds = player_seeds.count();
                 write!(txt, "{seeds}").unwrap();
             }
-            UiInfo::Playing => {
-                let turn = turn_state.current();
-                write!(txt, "{turn:?}").unwrap();
-            }
+            // UiInfo::Playing => {
+            //     let turn = turn_state.current();
+            //     write!(txt, "{turn:?}").unwrap();
+            // }
             UiInfo::OppoScore => {
                 write!(txt, "{oppo_score}").unwrap();
             }
             UiInfo::PlayerScore => {
                 write!(txt, "{player_score}").unwrap();
-            }
-            UiInfo::CardsLeft => {
-                write!(txt, "{total_cards}").unwrap();
-            }
+            } // UiInfo::CardsLeft => {
+              //     write!(txt, "{total_cards}").unwrap();
+              // }
         }
     }
 }

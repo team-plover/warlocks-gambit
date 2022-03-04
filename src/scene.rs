@@ -7,8 +7,8 @@ use crate::{
     animate::Animated,
     camera::PlayerCam,
     card_spawner::{
-        BirdPupil, BirdPupilRoot, OppoCardSpawner, OppoHand, PlayerCardSpawner, PlayerHand,
-        PlayerSleeve,
+        BirdPupil, BirdPupilRoot, OppoCardSpawner, OppoDeck, OppoHand, PlayerCardSpawner,
+        PlayerDeck, PlayerHand, PlayerSleeve,
     },
     gltf_hook::{GltfHook, GltfInstance},
     pile::{Pile, PileType},
@@ -26,6 +26,8 @@ impl GltfHook for Scene {
             "OppoHand" => cmds.insert_bundle((OppoHand, Animated::bob(1.0, 0.3, 6.0))),
             "PlayerHand" => cmds.insert_bundle((PlayerHand, Animated::bob(2.0, 0.05, 7.0))),
             "Pile" => cmds.insert(Pile::new(PileType::War)),
+            "PlayerDeck" => cmds.insert(PlayerDeck),
+            "OppoDeck" => cmds.insert(OppoDeck),
             "OppoPile" => cmds.insert(Pile::new(PileType::Oppo)),
             "PlayerPile" => cmds.insert(Pile::new(PileType::Player)),
             "ManBody" => cmds.insert(Animated::breath(0.0, 0.03, 6.0)),
@@ -50,7 +52,7 @@ fn setup_scene(
     mut scene_spawner: ResMut<SceneSpawner>,
     asset_server: Res<AssetServer>,
 ) {
-    let scene = if cfg!(feature = "debug") {
+    let scene = if !cfg!(feature = "debug") {
         "scene_debug.glb#Scene0"
     } else {
         "scene.glb#Scene0"
