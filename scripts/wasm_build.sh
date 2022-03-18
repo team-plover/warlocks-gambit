@@ -6,6 +6,7 @@ set -e
 # Files in OutDir is everything needed to run the web page.
 
 OutDir=target/wasm_package
+
 HttpServerAddress=0.0.0.0
 HttpServerPort=8000
 
@@ -18,19 +19,22 @@ fi
 # Extract project name from Cargo.toml
 #
 
-ProjName=`cargo pkgid`
-ProjName=${ProjName##*#}
-ProjName=${ProjName%:*}
+ProjName="$(cargo metadata --no-deps --format-version 1 |
+        sed -n 's/.*"name":"\([^"]*\)".*/\1/p')"
 
 #
 # Build
 #
 
+if [ ! -e target ] ; then
+    mkdir target
+fi
+
 cargo build \
 	--release --no-default-features \
 	--target wasm32-unknown-unknown \
 
-WasmFile=target/wasm32-unknown-unknown/release/$ProjName.wasm
+WasmFile="$(cargo metadata --format-version 1 | sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')/wasm32-unknown-unknown/release/$ProjName.wasm"
 
 if [ ! -e "$WasmFile" ]; then
 	echo "Script is borken, it expects file to exist: $WasmFile"
@@ -39,7 +43,14 @@ fi
 
 [ ! -e "$OutDir" ] || rm -r "$OutDir"
 
-$HOME/.cargo/bin/wasm-bindgen \
+BINDGEN_EXEC_PATH="${CARGO_HOME:-~/.cargo}/bin/wasm-bindgen"
+
+if [ ! -e "$BINDGEN_EXEC_PATH" ] ; then
+    echo "Please install wasm-bindgen, cannot generate the wasm output without it"
+    exit 1
+fi
+
+$BINDGEN_EXEC_PATH \
 	--no-typescript \
 	--out-dir "$OutDir" \
 	--target web \
