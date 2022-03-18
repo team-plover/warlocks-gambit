@@ -5,8 +5,6 @@ mod audio;
 mod card;
 mod card_effect;
 mod cheat;
-#[cfg(feature = "debug")] // only include if compiling in debug mode
-mod debug_overlay;
 mod deck;
 mod game_ui;
 mod gltf_hook;
@@ -17,12 +15,6 @@ mod scene;
 mod state;
 mod ui;
 mod war;
-
-#[cfg(not(feature = "debug"))] // add a dummy to make sure code doesn't break
-#[macro_export]
-macro_rules! add_dbg_text {
-    ($($whatever:tt)*) => {};
-}
 
 mod camera {
     use bevy::prelude::Component;
@@ -103,11 +95,11 @@ fn main() {
         .add_plugins(DefaultPlugins);
 
     #[cfg(feature = "debug")]
-    app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new())
-        .add_plugin(debug_overlay::Plugin);
+    app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new());
 
     app.insert_resource(ClearColor(Color::rgb(0.293, 0.3828, 0.4023)))
         .init_resource::<card_spawner::GameStarts>()
+        .add_plugin(bevy_debug_text_overlay::OverlayPlugin::default())
         .add_plugin(player_hand::Plugin(GameState::Playing))
         .add_plugin(oppo_hand::Plugin(GameState::Playing))
         .add_plugin(scene::Plugin(GameState::LoadScene))
@@ -149,8 +141,6 @@ fn init_loading_message(mut commands: Commands, ui_assets: Res<ui::common::UiAss
     use ui::common::*;
 
     let text = "Loading...";
-
-    //
 
     let node = NodeBundle {
         color: Color::NONE.into(),

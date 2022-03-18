@@ -216,6 +216,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy-debug-text-overlay"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1c31221bfc199c1226d216a286acf9d5636f8d25586c2c4f4eabe959f5d5b12"
+dependencies = [
+ "bevy",
+ "lazy_static",
+]
+
+[[package]]
 name = "bevy-inspector-egui"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1296,16 +1306,6 @@ dependencies = [
  "darling_core",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "dashmap"
-version = "4.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e77a43b28d0668df09411cb0bc9a8c2adc40f9a048afe863e05fd43251e8e39c"
-dependencies = [
- "cfg-if 1.0.0",
- "num_cpus",
 ]
 
 [[package]]
@@ -3134,15 +3134,14 @@ name = "warlocks-gambit"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy-debug-text-overlay",
  "bevy-inspector-egui",
  "bevy-ui-build-macros",
  "bevy-ui-navigation",
  "bevy_kira_audio",
  "bevy_mod_raycast",
- "dashmap",
  "enum-map",
  "fastrand",
- "lazy_static",
 ]
 
 [[package]]

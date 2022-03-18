@@ -7,10 +7,11 @@ edition = "2021"
 
 [features]
 dynamic = ["bevy/dynamic"]
-debug = ["bevy-inspector-egui", "lazy_static", "dashmap"]
+debug = ["bevy-inspector-egui", "bevy-debug-text-overlay/debug"]
 default = ["dynamic", "debug"]
 
 [dependencies]
+bevy-debug-text-overlay = { version = "1.0", default-features = false, features = ["builtin-font"] }
 bevy_kira_audio = "0.8"
 bevy-ui-navigation = "0.13.1"
 bevy = { version = "0.6", default-features = false, features = [
@@ -25,13 +26,8 @@ bevy = { version = "0.6", default-features = false, features = [
 bevy-ui-build-macros = "0.2.1"
 bevy-inspector-egui = { version = "0.8", optional = true }
 enum-map = "2"
-
 bevy_mod_raycast = "0.3"
-
 fastrand = "1.7"
-
-dashmap = { version = "4.0", optional = true }
-lazy_static = { version = "1.4", optional = true }
 
 [profile.dev.package."*"]
 opt-level = 1
