@@ -7,7 +7,6 @@ mod card_effect;
 mod cheat;
 mod deck;
 mod game_ui;
-mod gltf_hook;
 mod oppo_hand;
 mod pile;
 mod player_hand;

@@ -12,6 +12,7 @@ default = ["dynamic", "debug"]
 
 [dependencies]
 bevy-debug-text-overlay = { version = "1.0", default-features = false, features = ["builtin-font"] }
+bevy-scene-hook = "1.0"
 bevy_kira_audio = "0.8"
 bevy-ui-navigation = "0.13.1"
 bevy = { version = "0.6", default-features = false, features = [

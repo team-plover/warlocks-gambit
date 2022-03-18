@@ -251,6 +251,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy-scene-hook"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b05a1040ef2ce0014533f5fbce6873d85b243a78ebfa11360c84e2424e6f383"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
 name = "bevy-ui-build-macros"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3136,6 +3145,7 @@ dependencies = [
  "bevy",
  "bevy-debug-text-overlay",
  "bevy-inspector-egui",
+ "bevy-scene-hook",
  "bevy-ui-build-macros",
  "bevy-ui-navigation",
  "bevy_kira_audio",

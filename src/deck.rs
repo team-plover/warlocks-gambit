@@ -1,10 +1,10 @@
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_debug_text_overlay::screen_print;
+use bevy_scene_hook::SceneHook;
 
 use crate::{
     card::{Card, WordOfPower},
     card_spawner,
-    gltf_hook::GltfHook,
     scene::Scene,
     state::GameState,
     war::Value,
