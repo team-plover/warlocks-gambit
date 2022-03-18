@@ -1,6 +1,7 @@
 use super::common::*;
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy::{app::AppExit, input::mouse::MouseMotion, window::WindowMode};
+use bevy_debug_text_overlay::screen_print;
 use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
 use bevy_ui_navigation::{Focusable, Focused, NavEvent, NavRequest};
 
@@ -8,7 +9,6 @@ use bevy_ui_navigation::{Focusable, Focused, NavEvent, NavRequest};
 
 use crate::scene::ScenePreload;
 use crate::{
-    add_dbg_text,
     audio::{AudioChannel, AudioRequest, SfxParam},
     state::GameState,
 };
@@ -110,7 +110,7 @@ fn update_menu(
                 match elems.get(*from.first()).map(|t| t.2) {
                     Ok(MainMenuElem::Exit) => exit.send(AppExit),
                     Ok(MainMenuElem::Start) => {
-                        add_dbg_text!("Player pressed the start button");
+                        screen_print!("Player pressed the start button");
                         audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
                         game_state.set(GameState::LoadScene).unwrap();
                     }

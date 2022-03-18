@@ -2,10 +2,10 @@
 use std::fmt::Write;
 
 use bevy::prelude::{Plugin as BevyPlugin, *};
+use bevy_debug_text_overlay::screen_print;
 use bevy_ui_build_macros::{build_ui, size, style, unit};
 use enum_map::{enum_map, EnumMap};
 
-use crate::add_dbg_text;
 use crate::{
     card::WordOfPower,
     card_effect::{CardStats, SeedCount},
@@ -216,7 +216,7 @@ fn update_game_ui(
     player_seeds: Res<SeedCount>,
     stats: CardStats,
 ) {
-    add_dbg_text!(&format!("values left: {}", stats.remaining_score()), 0.1);
+    screen_print!("values left: {}", stats.remaining_score());
     let player_score = stats.player_score();
     let oppo_score = stats.oppo_score();
     // let total_cards = stats.cards_remaining();

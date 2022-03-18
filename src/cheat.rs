@@ -1,7 +1,7 @@
 use bevy::input::keyboard::KeyCode;
 use bevy::prelude::{Plugin as BevyPlugin, *};
+use bevy_debug_text_overlay::screen_print;
 
-use crate::add_dbg_text;
 use crate::{
     animate::Animated,
     card_effect::SeedCount,
@@ -54,13 +54,13 @@ fn control_bird_pupil(
     if eye_status.is_watching {
         match (grabbed_card.get_single(), eye.get_single_mut()) {
             (Ok(look_at), Ok(mut eye)) => {
-                add_dbg_text!("Tracking player card", 0.1);
+                screen_print!("Tracking player card");
                 let hand = look_at.translation;
                 let new_trans = Vec3::new(hand.x / 2.7, (hand.y - 6.05) / 1.65, 0.0) * 0.1;
                 eye.translation = new_trans;
             }
             (Err(_), Ok(mut eye)) => {
-                add_dbg_text!("Not tracking player card", 0.1);
+                screen_print!("Not tracking player card");
                 eye.translation = Vec3::ZERO;
             }
             _ => {}
@@ -92,7 +92,7 @@ fn execute_cheat(
                 }
             }
             CheatEvent::HideInSleeve(_) if watch.is_watching => {
-                add_dbg_text!("you got caught cheating!");
+                screen_print!("you got caught cheating!");
                 gameover_events.send(GameOverKind::CheatSpotted);
             }
             CheatEvent::HideInSleeve(entity) => {

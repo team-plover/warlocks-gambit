@@ -2,6 +2,7 @@ use bevy::{
     ecs::system::EntityCommands,
     prelude::{Plugin as BevyPlugin, *},
 };
+use bevy_scene_hook::{SceneHook, SceneInstance};
 
 use crate::{
     animate::Animated,
@@ -10,14 +11,13 @@ use crate::{
         BirdPupil, BirdPupilRoot, OppoCardSpawner, OppoDeck, OppoHand, PlayerCardSpawner,
         PlayerDeck, PlayerHand, PlayerSleeve,
     },
-    gltf_hook::{GltfHook, GltfInstance},
     pile::{Pile, PileType},
     state::GameState,
     ui::gameover::{gameover_prepare_scene, GameOverAnimation},
 };
 
 pub enum Scene {}
-impl GltfHook for Scene {
+impl SceneHook for Scene {
     fn hook_named_node(name: &Name, cmds: &mut EntityCommands) {
         match name.as_str() {
             "PlayerPerspective_Orientation" => cmds.insert(PlayerCam),
@@ -83,7 +83,7 @@ fn setup_scene(
 ) {
     if *ugly_hack == 0 {
         let gltf = scene_spawner.spawn(scene.game.clone());
-        cmds.spawn().insert(GltfInstance::<Scene>::new(gltf));
+        cmds.spawn().insert(SceneInstance::<Scene>::new(gltf));
 
         *ugly_hack = 1;
     } else if *ugly_hack == 1 {

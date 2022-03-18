@@ -1,10 +1,10 @@
 use bevy::prelude::{Plugin as BevyPlugin, *};
+use bevy_debug_text_overlay::screen_print;
+use bevy_scene_hook::SceneHook;
 
-use crate::add_dbg_text;
 use crate::{
     card::{Card, WordOfPower},
     card_spawner,
-    gltf_hook::GltfHook,
     scene::Scene,
     state::GameState,
     war::Value,
@@ -114,9 +114,9 @@ fn resize_decks(
     use bevy::render::mesh::VertexAttributeValues::Float32x3;
     let (player, oppo) = (player_parent.single(), oppo_parent.single());
     if let (Ok(player), Ok(oppo)) = (meshes_q.get(player[0]), meshes_q.get(oppo[0])) {
-        add_dbg_text!("changing deck sizes", 0.1);
+        screen_print!("changing deck sizes");
         if let Some(player) = meshes.get_mut(player.clone()) {
-            add_dbg_text!("got the player mesh", 0.1);
+            screen_print!("got the player mesh");
             // 18 -> 0.124
             // 0 -> -0.9
             let player_cards = player_deck.remaining() as f32;
@@ -127,7 +127,7 @@ fn resize_decks(
             }
         }
         if let Some(oppo) = meshes.get_mut(oppo.clone()) {
-            add_dbg_text!("got the oppo mesh", 0.1);
+            screen_print!("got the oppo mesh");
             // 18 -> 0.124
             // 0 -> -0.9
             let oppo_cards = oppo_deck.remaining() as f32;
