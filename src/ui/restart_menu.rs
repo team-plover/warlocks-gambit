@@ -1,10 +1,29 @@
-use super::gameover::GameOverKind;
-use super::{common::*, gameover::GameoverAssets};
-use crate::state::GameState;
+use super::common::{MenuCursor, UiAssets};
 use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy_ui_build_macros::{build_ui, size, style, unit};
 use bevy_ui_navigation::{Focusable, NavEvent, NavRequest};
+
+use crate::{
+    card_spawner::{EndReason, GameOver},
+    cleanup_marked,
+    state::GameState,
+};
+
+struct RestartAssets {
+    defeat: Handle<Image>,
+    victory: Handle<Image>,
+}
+
+impl FromWorld for RestartAssets {
+    fn from_world(world: &mut World) -> Self {
+        let assets = world.get_resource::<AssetServer>().unwrap();
+        Self {
+            defeat: assets.load("menu/ending_Defeat.png"),
+            victory: assets.load("menu/ending_Victory.png"),
+        }
+    }
+}
 
 #[derive(Component, Clone)]
 enum Button {
@@ -12,93 +31,63 @@ enum Button {
     ExitApp,
 }
 
-fn init(
+#[derive(Clone, Component)]
+struct RestartMenuRoot;
+
+fn handle_gameover_event(
     mut commands: Commands,
     ui_assets: Res<UiAssets>,
-    kind: Res<GameOverKind>,
-    images: Res<GameoverAssets>,
+    assets: Res<RestartAssets>,
+    mut state: ResMut<State<GameState>>,
+    mut events: EventReader<GameOver>,
 ) {
-    #[cfg(not(target_arch = "wasm32"))]
-    let continue_text = match *kind {
-        GameOverKind::PlayerWon => "New game",
-        GameOverKind::PlayerLost | GameOverKind::CheatSpotted => "Restart",
-    };
-    #[cfg(target_arch = "wasm32")]
-    let continue_text = match *kind {
-        GameOverKind::PlayerWon => "Press SPACE to start new game",
-        GameOverKind::PlayerLost | GameOverKind::CheatSpotted => "Press SPACE to restart",
-    };
-    let image = match *kind {
-        GameOverKind::PlayerWon => images.victory.clone(),
-        GameOverKind::PlayerLost | GameOverKind::CheatSpotted => images.defeat.clone(),
+    use self::Button::{ExitApp, Restart};
+    use EndReason::{CaughtCheating, Loss, Victory};
+    if let Some(GameOver(reason)) = events.iter().next() {
+        state.set(GameState::RestartMenu).unwrap();
+        let continue_text = match *reason {
+            Victory => "Congratulation! Replay?",
+            Loss => "You couldn't make up the point difference! Try again?",
+            CaughtCheating => "You got caught cheating! Try again?",
+        };
+        let won = matches!(*reason, Victory);
+        let image = if won { &assets.victory } else { &assets.defeat };
+        let image = ImageBundle { image: image.clone().into(), ..Default::default() };
+
+        let node = NodeBundle {
+            color: Color::NONE.into(),
+            style: style! {
+                flex_direction: FlexDirection::ColumnReverse,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+            },
+            ..Default::default()
+        };
+
+        let focusable = Focusable::default();
+        let cursor = MenuCursor::spawn_ui_element(&mut commands);
+        build_ui! {
+            #[cmd(commands)]
+            node{ size: size!(100 pct, 100 pct) }[;Name::new("Restart Menu root"), RestartMenuRoot](
+                id(cursor),
+                node[;
+                    UiColor(Color::rgba(0., 0., 0., 0.7)),
+                    Name::new("Shadow"),
+                    style! { position_type: PositionType::Absolute, size: size!(100 pct, 100 pct), }
+                ],
+                node[; Name::new("Menu columns")](
+                    entity[image; style! { size: size!(auto, 45 pct), }],
+                    entity[ui_assets.large_text(continue_text);],
+                    if (cfg!(target_arch = "wasm32")) {
+                        entity[ui_assets.large_text("(Press space to restart)");]
+                    } else {
+                        entity[ui_assets.large_text("Restart"); focusable, Restart],
+                        entity[ui_assets.large_text("Exit to desktop"); focusable, ExitApp],
+                    }
+                )
+            )
+        };
     }
-    .into();
-
-    //
-
-    let node = NodeBundle {
-        color: Color::NONE.into(),
-        style: style! {
-            flex_direction: FlexDirection::ColumnReverse,
-            align_items: AlignItems::Center,
-            align_self: AlignSelf::Center,
-
-            size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
-            position_type: PositionType::Absolute,
-            justify_content: JustifyContent::Center,
-        },
-        ..Default::default()
-    };
-
-    #[cfg(not(target_arch = "wasm32"))]
-    build_ui! {
-        #[cmd(commands)]
-        node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
-            node{ position_type: PositionType::Absolute, size: Size::new(Val::Percent(0.), Val::Percent(0.)) }[;
-                UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
-                MenuCursor::default(),
-                Name::new("Cursor")
-            ],
-            node{ position_type: PositionType::Absolute }[;
-                UiColor(Color::rgba(0., 0., 0., 0.7)),
-                Name::new("'Shadow'"),
-                style! { size: size!(100 pct, 100 pct), }
-            ],
-            node[; Name::new("Menu columns")](
-                node[
-                    ImageBundle { image, ..Default::default() };
-                    style! { size: size!(auto, 30 pct), }
-                ],
-                node[ui_assets.large_text(continue_text); Focusable::default(), Button::Restart],
-                node[ui_assets.large_text("Exit to desktop"); Focusable::default(), Button::ExitApp]
-            )
-        )
-    };
-
-    // TODO: this is copied from code above with few minor changes
-    #[cfg(target_arch = "wasm32")]
-    build_ui! {
-        #[cmd(commands)]
-        node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
-            node{ position_type: PositionType::Absolute, size: Size::new(Val::Percent(0.), Val::Percent(0.)) }[;
-                UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
-                MenuCursor::default(),
-                Name::new("Cursor")
-            ],
-            node{ position_type: PositionType::Absolute }[;
-                UiColor(Color::rgba(0., 0., 0., 0.7)),
-                Name::new("'Shadow'"),
-                style! { size: size!(100 pct, 100 pct), }
-            ],
-            node[; Name::new("Menu columns")](
-                node[
-                    ImageBundle { image, ..Default::default() };
-                    style! { size: size!(auto, 30 pct), }
-                ],
-                node[ui_assets.large_text(continue_text);]
-            )
-        )
-    };
 }
 
 fn update(
@@ -128,8 +117,12 @@ fn continue_on_space(mut keys: ResMut<Input<KeyCode>>, mut state: ResMut<State<G
 pub struct Plugin;
 impl bevy::app::Plugin for Plugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(SystemSet::on_enter(GameState::RestartMenu).with_system(init));
-        app.add_system_set(SystemSet::on_exit(GameState::RestartMenu).with_system(exit_menu));
+        app.init_resource::<RestartAssets>().add_event::<GameOver>();
+        app.add_system(handle_gameover_event);
+        app.add_system_set(
+            SystemSet::on_exit(GameState::RestartMenu)
+                .with_system(cleanup_marked::<RestartMenuRoot>),
+        );
         app.add_system_set(
             SystemSet::on_update(GameState::RestartMenu)
                 .with_system(update)

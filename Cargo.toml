@@ -1,6 +1,6 @@
 [package]
 name = "warlocks-gambit"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -12,19 +12,17 @@ default = ["dynamic", "debug"]
 
 [dependencies]
 bevy-debug-text-overlay = { version = "1.0", default-features = false, features = ["builtin-font"] }
-bevy-scene-hook = "1.0"
+bevy-scene-hook = "1.1"
 bevy_kira_audio = "0.8"
 bevy-ui-navigation = "0.13.1"
 bevy = { version = "0.6", default-features = false, features = [
-    "bevy_gilrs",
     "bevy_winit",
     "render",
     "png",
-    "hdr",
+    "jpeg",
     "x11",
-    "filesystem_watcher",
 ] }
-bevy-ui-build-macros = "0.2.1"
+bevy-ui-build-macros = "0.3.0"
 bevy-inspector-egui = { version = "0.8", optional = true }
 enum-map = "2"
 bevy_mod_raycast = "0.3"

@@ -1,15 +1,13 @@
-use super::common::*;
+use super::common::{MenuCursor, UiAssets};
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy::{app::AppExit, input::mouse::MouseMotion, window::WindowMode};
 use bevy_debug_text_overlay::screen_print;
 use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
 use bevy_ui_navigation::{Focusable, Focused, NavEvent, NavRequest};
 
-// TODO: wait until background scene is loaded (it should take less than second)
-
-use crate::scene::ScenePreload;
 use crate::{
     audio::{AudioChannel, AudioRequest, SfxParam},
+    cleanup_marked,
     state::GameState,
 };
 
@@ -18,6 +16,9 @@ struct MovingSlider;
 
 #[derive(Component, Clone)]
 struct CreditOverlay;
+
+#[derive(Clone, Component)]
+struct MainMenuRoot;
 
 #[derive(Component, Clone, PartialEq)]
 enum MainMenuElem {
@@ -31,14 +32,16 @@ enum MainMenuElem {
 }
 
 pub struct MenuAssets {
+    team_name: Handle<Image>,
     title_image: Handle<Image>,
-    pub slider_handle: Handle<Image>,
-    pub slider_bg: Handle<Image>,
+    slider_handle: Handle<Image>,
+    slider_bg: Handle<Image>,
 }
 impl FromWorld for MenuAssets {
     fn from_world(world: &mut World) -> Self {
         let assets = world.get_resource::<AssetServer>().unwrap();
         Self {
+            team_name: assets.load("team_name.png"),
             title_image: assets.load("title_image.png"),
             slider_bg: assets.load("slider_bg.png"),
             slider_handle: assets.load("slider_handle.png"),
@@ -112,7 +115,7 @@ fn update_menu(
                     Ok(MainMenuElem::Start) => {
                         screen_print!("Player pressed the start button");
                         audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
-                        game_state.set(GameState::LoadScene).unwrap();
+                        game_state.set(GameState::WaitSceneLoaded).unwrap();
                     }
                     Ok(MainMenuElem::LockMouse) => {
                         let window = windows.get_primary_mut().expect(window_msg);
@@ -190,12 +193,20 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
         let volume_name = name.to_string() + " volume";
         let handle_name = Name::new(name.to_string() + " volume slider handle");
         let slider_name = Name::new(name.to_string() + " volume slider");
+        let position = Rect {
+            bottom: Val::Px(-10.0),
+            left: Val::Percent(strength * 0.9),
+            ..Default::default()
+        };
         build_ui! {
             #[cmd(cmds)]
             node { flex_direction: FD::Row }[; slider_name](
                 node[text_bundle(&volume_name, 30.0); style! { margin: rect!(10 px), }],
                 node(
-                    entity[image(&menu_assets.slider_bg); style! { size: size!( 200 px, 20 px), }],
+                    entity[
+                        image(&menu_assets.slider_bg);
+                        style! { size: size!( 200 px, 20 px), }
+                    ],
                     entity[
                         image(&menu_assets.slider_handle);
                         focusable,
@@ -204,11 +215,7 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
                         style! {
                             size: size!( 40 px, 40 px),
                             position_type: PT::Absolute,
-                            position: Rect {
-                                bottom: Val::Px(-10.0),
-                                left: Val::Percent(strength * 0.9),
-                                ..Default::default()
-                            },
+                            position: position,
                         }
                     ]
                 )
@@ -219,36 +226,44 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
     let master_slider = slider("Master", AudioChannel::Master, 100.0);
     let sfx_slider = slider("Sfx", AudioChannel::Sfx, 50.0);
     let music_slider = slider("Music", AudioChannel::Music, 50.0);
+    let cursor = MenuCursor::spawn_ui_element(&mut cmds);
 
-    #[cfg(not(target_arch = "wasm32"))]
     build_ui! {
         #[cmd(cmds)]
-        node{ min_size: size!(100 pct, 100 pct), flex_direction: FD::Column }[;Name::new("root node"), MenuRoot](
-            node{ position_type: PT::Absolute, size: Size::new(Val::Percent(0.), Val::Percent(0.)) }[;
-                UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
-                MenuCursor::default(),
-                Name::new("Cursor")
-            ],
+        node{
+            min_size: size!(100 pct, 100 pct),
+            flex_direction: FD::ColumnReverse,
+            justify_content: JustifyContent::Center
+        }[; Name::new("Main menu root node"), MainMenuRoot](
             entity[
-                large_text(""); // I have no idea what I am doing, but it works
-                Name::new("End pacer"),
-                style! { size: size!(auto, 10 pct), }
+                image(&ui_assets.background_image);
+                style! { size: size!(100 pct, 100 pct), position_type: PT::Absolute, }
+            ],
+            id(cursor),
+            entity[
+                image(&menu_assets.title_image);
+                Name::new("Title card"),
+                style! { size: size!(auto, 60 pct), }
             ],
             node{ flex_direction: FD::Row }[; Name::new("Menu columns")](
                 node[; Name::new("Menu node")](
                     node[large_text("Start");   focusable, Name::new("Start button"), Start],
                     node[large_text("Credits"); Focusable::lock(), Name::new("Credits button"), Credits],
-                    node[large_text("Exit");    focusable, Name::new("Exit button"), Exit]
+                    if (!cfg!(target_arch = "wasm32")) {
+                        node[large_text("Exit"); focusable, Name::new("Exit button"), Exit]
+                    },
                 ),
                 node{ align_items: AlignItems::FlexEnd, margin: rect!(50 px) }[; Name::new("Audio settings")](
                     id(master_slider),
                     id(music_slider),
-                    id(sfx_slider)
+                    id(sfx_slider),
                 ),
                 node[; Name::new("Graphics column")](
-                    node[large_text("Lock mouse cursor"); focusable, LockMouse],
+                    if (!cfg!(target_arch = "wasm32")) {
+                        node[large_text("Lock mouse cursor"); focusable, LockMouse],
+                        node[large_text("Fit window to 16:9"); focusable, Set16_9],
+                    },
                     node[large_text("Toggle Full screen"); focusable, ToggleFullScreen],
-                    node[large_text("Fit window to 16:9"); focusable, Set16_9]
                 )
             ),
             node{
@@ -259,7 +274,7 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
                 justify_content: JustifyContent::Center
             }[; UiColor(Color::rgb(0.1, 0.1, 0.1)), Name::new("Credits overlay"), CreditOverlay](
                 node[
-                    image(&menu_assets.title_image);
+                    image(&menu_assets.team_name);
                     Name::new("Title Image"),
                     style! { size: size!(auto, 30 pct), }
                 ],
@@ -273,87 +288,14 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
             )
         )
     };
-
-    // TODO: this is copied from code above with few minor changes
-    #[cfg(target_arch = "wasm32")]
-    build_ui! {
-        #[cmd(cmds)]
-        node{ min_size: size!(100 pct, 100 pct), flex_direction: FD::Column }[;Name::new("root node"), MenuRoot](
-            node{ position_type: PT::Absolute, size: Size::new(Val::Percent(0.), Val::Percent(0.)) }[;
-                UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
-                MenuCursor::default(),
-                Name::new("Cursor")
-            ],
-            entity[
-                large_text(""); // I have no idea what I am doing, but it works
-                Name::new("End pacer"),
-                style! { size: size!(auto, 10 pct), }
-            ],
-            node{ flex_direction: FD::Row }[; Name::new("Menu columns")](
-                node[; Name::new("Menu node")](
-                    node[large_text("Start");   focusable, Name::new("Start button"), Start],
-                    node[large_text("Credits"); Focusable::lock(), Name::new("Credits button"), Credits]
-                ),
-                node{ align_items: AlignItems::FlexEnd, margin: rect!(50 px) }[; Name::new("Audio settings")](
-                    id(master_slider),
-                    id(music_slider),
-                    id(sfx_slider)
-                ),
-                node[; Name::new("Graphics column")](
-                    node[large_text("Toggle Full screen"); focusable, ToggleFullScreen]
-                )
-            ),
-            node{
-                position_type: PT::Absolute,
-                position: rect!(10 pct),
-                display: Display::None,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center
-            }[; UiColor(Color::rgb(0.1, 0.1, 0.1)), Name::new("Credits overlay"), CreditOverlay](
-                node[
-                    image(&menu_assets.title_image);
-                    Name::new("Title Image"),
-                    style! { size: size!(auto, 30 pct), }
-                ],
-                node[large_text("music, sfx: Samuel_sound");],
-                node[large_text("graphics: Xolotl");],
-                node[large_text("code, voices, design: Gibonus");],
-                node[large_text("more code: vasukas");],
-                node[large_text("thanks: BLucky (devops), Lorithan (game idea)");],
-                node[large_text("Also the BEVY community <3 <3 <3");],
-                node[text_bundle("(Click anywhere to exit)", 30.0);]
-            )
-        )
-    };
-}
-
-fn setup_scene(
-    mut cmds: Commands,
-    mut scene_spawner: ResMut<SceneSpawner>,
-    preload: Res<ScenePreload>,
-) {
-    let scene = preload.main_menu.clone();
-    let parent = cmds
-        .spawn()
-        .insert(MenuRoot)
-        .insert(Name::new("Menu background"))
-        .insert(Transform::default())
-        .insert(GlobalTransform::default())
-        .id();
-    scene_spawner.spawn_as_child(scene, parent);
 }
 
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuAssets>()
-            .insert_resource(ScenePreload::default())
-            .add_system_set(
-                SystemSet::on_enter(self.0)
-                    .with_system(setup_main_menu)
-                    .with_system(setup_scene),
-            )
-            .add_system_set(SystemSet::on_exit(self.0).with_system(exit_menu))
+            .add_system_set(SystemSet::on_enter(self.0).with_system(setup_main_menu))
+            .add_system_set(SystemSet::on_exit(self.0).with_system(cleanup_marked::<MainMenuRoot>))
             .add_system_set(
                 SystemSet::on_update(self.0)
                     .with_system(update_sliders)
