@@ -106,10 +106,11 @@ fn chose_card(
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
+        use crate::system_helper::EasySystemSetCtor;
         #[cfg(feature = "debug")]
         app.register_inspectable::<OppoCard>();
-        app.add_system_set(SystemSet::on_enter(TurnState::Draw).with_system(draw_hand))
-            .add_system_set(SystemSet::on_enter(TurnState::Oppo).with_system(chose_card))
-            .add_system_set(SystemSet::on_update(self.0).with_system(update_oppo_hand));
+        app.add_system_set(TurnState::Draw.on_enter(draw_hand))
+            .add_system_set(TurnState::Oppo.on_enter(chose_card))
+            .add_system_set(self.0.on_update(update_oppo_hand));
     }
 }

@@ -167,11 +167,8 @@ fn handle_turn_end(
                 .insert(pile.additional_card())
                 .remove::<PlayedCard>();
             let multi = turn_effects.multiplier - 1;
-            let zero_bonus = if card.value == Value::Zero && turn_effects.zero_bonus {
-                12
-            } else {
-                0
-            };
+            let zero_bonus = card.value == Value::Zero && turn_effects.zero_bonus;
+            let zero_bonus = if zero_bonus { 12 } else { 0 };
             score_bonuses.add_to_owner($who, (card.value as i32) * multi);
             score_bonuses.add_to_owner($who, zero_bonus * (multi + 1));
         };
@@ -345,6 +342,7 @@ fn cleanup(
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
+        use crate::system_helper::EasySystemSetCtor;
         use TurnState::{OppoActivated, PlayerActivated};
         app.add_event::<ActivateCard>()
             .init_resource::<TurnCount>()
@@ -352,13 +350,13 @@ impl BevyPlugin for Plugin {
             .init_resource::<TurnEffects>()
             .init_resource::<SeedCount>()
             .insert_resource(Initiative(Participant::Player))
-            .add_system_set(SystemSet::on_update(self.0).with_system(handle_activated))
-            .add_system_set(SystemSet::on_enter(TurnState::New).with_system(handle_new_turn))
-            .add_system_set(SystemSet::on_update(TurnState::Draw).with_system(complete_draw))
-            .add_system_set(SystemSet::on_exit(PlayerActivated).with_system(handle_turn_end))
-            .add_system_set(SystemSet::on_exit(OppoActivated).with_system(handle_turn_end))
-            .add_system_set(SystemSet::on_exit(self.0).with_system(cleanup))
-            .add_system_set(SystemSet::on_update(PlayerActivated).with_system(handle_player_active))
-            .add_system_set(SystemSet::on_update(OppoActivated).with_system(handle_oppo_active));
+            .add_system_set(self.0.on_update(handle_activated))
+            .add_system_set(self.0.on_exit(cleanup))
+            .add_system_set(TurnState::New.on_enter(handle_new_turn))
+            .add_system_set(TurnState::Draw.on_update(complete_draw))
+            .add_system_set(PlayerActivated.on_update(handle_player_active))
+            .add_system_set(PlayerActivated.on_exit(handle_turn_end))
+            .add_system_set(OppoActivated.on_update(handle_oppo_active))
+            .add_system_set(OppoActivated.on_exit(handle_turn_end));
     }
 }

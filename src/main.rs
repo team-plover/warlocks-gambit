@@ -12,6 +12,7 @@ mod pile;
 mod player_hand;
 mod scene;
 mod state;
+mod system_helper;
 mod ui;
 mod war;
 
@@ -50,9 +51,11 @@ pub struct GameStarts(pub u32);
 pub struct CardOrigin(pub Participant);
 
 #[derive(Component, Clone)]
-struct WaitScreenRoot;
+struct WaitRoot;
 
 fn main() {
+    use system_helper::EasySystemSetCtor;
+
     let mut app = App::new();
 
     app.insert_resource(Msaa { samples: 4 })
@@ -83,17 +86,10 @@ fn main() {
         .add_plugin(pile::Plugin(GameState::Playing))
         .add_plugin(card_effect::Plugin(GameState::Playing))
         .add_plugin(game_ui::Plugin(GameState::Playing))
-        .add_system_set(SystemSet::on_enter(GameState::Playing).with_system(first_draw))
-        .add_system_set(
-            SystemSet::on_enter(GameState::WaitSceneLoaded).with_system(setup_load_screen),
-        )
-        .add_system_set(
-            SystemSet::on_update(GameState::WaitSceneLoaded).with_system(complete_load_screen),
-        )
-        .add_system_set(
-            SystemSet::on_exit(GameState::WaitSceneLoaded)
-                .with_system(cleanup_marked::<WaitScreenRoot>),
-        )
+        .add_system_set(GameState::Playing.on_enter(first_draw))
+        .add_system_set(GameState::WaitLoaded.on_enter(setup_load_screen))
+        .add_system_set(GameState::WaitLoaded.on_update(complete_load_screen))
+        .add_system_set(GameState::WaitLoaded.on_exit(cleanup_marked::<WaitRoot>))
         .add_startup_system(setup);
 
     app.run();
@@ -138,7 +134,7 @@ fn setup_load_screen(
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
                 size: size!(100 pct, 100 pct)
-            }[; Name::new("Root loading screen node"), WaitScreenRoot] (
+            }[; Name::new("Root loading screen node"), WaitRoot] (
                 entity[ assets.background(); Name::new("Background") ],
                 entity[assets.large_text("Loading..."); ]
             )
