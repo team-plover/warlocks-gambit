@@ -9,6 +9,10 @@ pub enum GameState {
     RestartMenu,
 }
 
+// LEAD: potential improvement: logic in game_flow really does not care for the
+// distinction between player turn and oppo turn, we might be able to merge
+// Oppo and Player
+/// In-game game state, see the diagram in [`crate::game_flow`] for flow chart.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub enum TurnState {
     /// Game just started
@@ -19,10 +23,8 @@ pub enum TurnState {
     New,
     /// Player's turn to play a card
     Player,
-    /// Player has played a card
-    PlayerActivated,
     /// Oppo's turn to select a card
     Oppo,
-    /// Oppo has played his card
-    OppoActivated,
+    /// A participants has played a card
+    CardPlayed,
 }

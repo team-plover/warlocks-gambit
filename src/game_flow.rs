@@ -1,5 +1,5 @@
-//! What happens after activating a card, including win/loss conditions and
-//! score tracking.
+//! Game flow driver, manages how cards are played, when it is possible to
+//! play them and who can play them. Also manages score and card effects.
 //!
 //! # Architecture
 //!
@@ -19,8 +19,8 @@
 //!
 //! * [`handle_new_turn`]: end game if one of the players cannot win
 //! * [`complete_draw`]: Set who's turn it is to play after drawing cards
-//! * [`handle_activated`]: Handle effects based on played card and enter
-//!   Activated state.
+//! * [`handle_played`]: Handle effects based on played card and enter
+//!   `CardPlayed` state.
 //! * [`wait_active`]: Wait a little time after a card is played
 //! * [`handle_turn_end`]: Start new turn after swapping initiative,
 //!   if two cards are played, update scores and distribute cards to
@@ -58,15 +58,15 @@
 //!                            →---→|(Player | Oppo) State|  |
 //!                                 -----------------------  |
 //!                                            ↓             |
-//! -------------------------------------------------------  |
-//! | oppo_hand or player_hand send an ActivateCard event |  |
-//! -------------------------------------------------------  |
+//!   ---------------------------------------------------    |
+//!   | oppo_hand or player_hand send an PlayCard event |    |
+//!   ---------------------------------------------------    |
 //!                           ↓                              |
-//!                     handle_activated                     |
+//!                      handle_played                       |
 //!                           ↓                              |
-//!       -----------------------------------------          |
-//!       |(PlayerActivated | OppoActivated) State|          |
-//!       -----------------------------------------          |
+//!                  --------------------                    |
+//!                  | CardPlayed State |                    |
+//!                  --------------------                    |
 //!                           ↓                              |
 //!                      wait_active--→ handle_turn_end→-----↑
 //! ```
@@ -84,9 +84,9 @@
 //!
 //! ## Effects
 //!
-//! The [`handle_activated`] system adds card effects to the [`TurnEffects`] or
-//! directly updates the [`SeedCount`] resource when an [`ActivateCard`] event
-//! is received, it then enters an `Active` [`TurnState`].
+//! The [`handle_played`] system adds card effects to the [`TurnEffects`] or
+//! directly updates the [`SeedCount`] resource when an [`PlayCard`] event
+//! is received, it then enters [`TurnState::CardPlayed`].
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::{Plugin as BevyPlugin, *};
@@ -108,7 +108,7 @@ use crate::{
 #[derive(Component)]
 pub struct PlayedCard;
 
-/// Who is the first to play
+/// Who is playing a card currently
 pub struct Initiative(Participant);
 impl Initiative {
     fn swap(&mut self) {
@@ -121,13 +121,13 @@ impl Initiative {
 
 /// Play a card.
 ///
-/// Used by sending an `ActivateCard` event to an `EventWriter<ActivateCard>`.
-/// See [`handle_activated`] for what happens when a card is played.
-pub struct ActivateCard {
+/// Used by sending an `PlayCard` event to an `EventWriter<PlayCard>`.
+/// See [`handle_played`] for what happens when a card is played.
+pub struct PlayCard {
     pub card: Entity,
     pub who: Participant,
 }
-impl ActivateCard {
+impl PlayCard {
     pub fn new(card: Entity, who: Participant) -> Self {
         Self { card, who }
     }
@@ -135,7 +135,7 @@ impl ActivateCard {
 
 /// Active effects.
 ///
-/// It is updated in [`handle_activated`] when a card is played. It is read and
+/// It is updated in [`handle_played`] when a card is played. It is read and
 /// reset in [`handle_turn_end`] when each player has played a card.
 struct TurnEffects {
     /// Winning card is swapped.
@@ -201,19 +201,19 @@ impl SeedCount {
 #[derive(Default)]
 pub struct TurnCount(pub usize);
 
-/// Handle [`ActivateCard`] events.
+/// Handle [`PlayCard`] events.
 ///
-/// Adds card effects from the [`ActivateCard::card`] to the [`TurnEffects`] or
-/// directly updates the [`SeedCount`] resource when an [`ActivateCard`] event
+/// Adds card effects from the [`PlayCard::card`] to the [`TurnEffects`] or
+/// directly updates the [`SeedCount`] resource when an [`PlayCard`] event
 /// is received, move the card to the war [`Pile`], and then enter the active
-/// [`TurnState`] corresponding to [`ActivateCard::who`] played the card.
+/// [`TurnState`] corresponding to [`PlayCard::who`] played the card.
 ///
 /// ## Card effects
 ///
 /// * `Egeq`: Give an extra seed to the player.
 /// * `Qube`, `Zihbm` and `Geh`: See [`TurnEffects::add`].
-fn handle_activated(
-    mut events: EventReader<ActivateCard>,
+fn handle_played(
+    mut events: EventReader<PlayCard>,
     mut ui_events: EventWriter<EffectEvent>,
     mut cmds: Commands,
     mut pile: Query<&mut Pile>,
@@ -227,7 +227,7 @@ fn handle_activated(
 ) {
     use PileType::War;
     use WordOfPower::*;
-    for ActivateCard { card, who } in events.iter() {
+    for PlayCard { card, .. } in events.iter() {
         let msg = "War pile exists";
         let mut pile = pile.iter_mut().find(|p| p.which == War).expect(msg);
         cmds.entity(*card)
@@ -252,11 +252,7 @@ fn handle_activated(
             Ok(Some(Geh)) => turn_effects.add(Geh),
             _ => {}
         }
-        let new_state = match who {
-            Participant::Oppo => TurnState::OppoActivated,
-            Participant::Player => TurnState::PlayerActivated,
-        };
-        turn.set(new_state).unwrap();
+        turn.set(TurnState::CardPlayed).unwrap();
     }
 }
 
@@ -455,20 +451,17 @@ pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         use crate::system_helper::EasySystemSetCtor;
-        use TurnState::{OppoActivated, PlayerActivated};
-        app.add_event::<ActivateCard>()
+        app.add_event::<PlayCard>()
             .init_resource::<TurnCount>()
             .init_resource::<ScoreBonuses>()
             .init_resource::<TurnEffects>()
             .init_resource::<SeedCount>()
             .insert_resource(Initiative(Participant::Player))
-            .add_system_set(self.0.on_update(handle_activated))
+            .add_system_set(self.0.on_update(handle_played))
             .add_system_set(self.0.on_exit(cleanup))
             .add_system_set(TurnState::New.on_enter(handle_new_turn))
             .add_system_set(TurnState::Draw.on_update(complete_draw))
-            .add_system_set(PlayerActivated.on_update(wait_active))
-            .add_system_set(PlayerActivated.on_exit(handle_turn_end))
-            .add_system_set(OppoActivated.on_update(wait_active))
-            .add_system_set(OppoActivated.on_exit(handle_turn_end));
+            .add_system_set(TurnState::CardPlayed.on_update(wait_active))
+            .add_system_set(TurnState::CardPlayed.on_exit(handle_turn_end));
     }
 }

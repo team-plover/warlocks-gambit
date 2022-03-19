@@ -3,7 +3,7 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_debug_text_overlay::screen_print;
 
 use crate::{
-    animate::Animated, card_effect::SeedCount, game_ui::EffectEvent, player_hand::GrabbedCard,
+    animate::Animated, game_flow::SeedCount, game_ui::EffectEvent, player_hand::GrabbedCard,
     state::GameState, EndReason, GameOver, GameStarts,
 };
 
@@ -45,8 +45,7 @@ fn use_seed(
     mut ui: EventWriter<EffectEvent>,
     input: Res<Input<KeyCode>>,
 ) {
-    if input.just_pressed(KeyCode::Space) && seed.count() != 0 {
-        assert!(seed.consume());
+    if input.just_pressed(KeyCode::Space) && seed.consume() {
         cheats.send(CheatEvent::ConfuseBird);
         ui.send(EffectEvent::UseSeed);
     }

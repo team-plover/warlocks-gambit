@@ -5,9 +5,8 @@ use fastrand::usize as randusize;
 
 use crate::{
     card::{Card, SpawnCard, WordOfPower},
-    card_effect::{ActivateCard, PlayedCard},
     deck::OppoDeckRes,
-    // pile::{Pile, PileCard, PileType},
+    game_flow::{PlayCard, PlayedCard},
     state::{GameState, TurnState},
     war::BattleOutcome,
     Participant,
@@ -41,7 +40,6 @@ fn update_oppo_hand(
     mut cards: Query<(&mut Transform, &OppoCard)>,
     time: Res<Time>,
 ) {
-    // TODO: subtile go up/down hover effect
     let card_speed = 10.0 * time.delta_seconds();
     let hand_transform = oppo_hand.single();
     let hand_pos = hand_transform.translation;
@@ -59,11 +57,9 @@ fn update_oppo_hand(
 
 fn chose_card(
     mut cmds: Commands,
-    mut card_events: EventWriter<ActivateCard>,
+    mut card_events: EventWriter<PlayCard>,
     cards: Query<(Entity, &Card), With<OppoCard>>,
     war_card: Query<&Card, With<PlayedCard>>,
-    // pile_cards: Query<&PileCard>,
-    // pile: Query<&Pile>,
 ) {
     use BattleOutcome::{Loss, Win};
     use WordOfPower::Zihbm;
@@ -100,7 +96,7 @@ fn chose_card(
         }
     };
     cmds.entity(selected).remove::<OppoCard>();
-    card_events.send(ActivateCard::new(selected, Participant::Oppo));
+    card_events.send(PlayCard::new(selected, Participant::Oppo));
 }
 
 pub struct Plugin(pub GameState);

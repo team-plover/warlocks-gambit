@@ -42,11 +42,6 @@ impl SceneHook for Scene {
     }
 }
 
-#[derive(Default)]
-pub struct ScenePreload {
-    pub game: Handle<bevy::prelude::Scene>,
-}
-
 fn load_scene(
     mut cmds: Commands,
     mut scene_spawner: ResMut<SceneSpawner>,

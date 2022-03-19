@@ -8,7 +8,7 @@ use enum_map::{enum_map, EnumMap};
 
 use crate::{
     card::WordOfPower,
-    card_effect::{CardStats, SeedCount},
+    game_flow::{CardStats, SeedCount},
     state::GameState,
 };
 

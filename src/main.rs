@@ -3,9 +3,9 @@ use bevy::prelude::*;
 mod animate;
 mod audio;
 mod card;
-mod card_effect;
 mod cheat;
 mod deck;
+mod game_flow;
 mod game_ui;
 mod oppo_hand;
 mod pile;
@@ -84,7 +84,7 @@ fn main() {
         .add_plugin(card::Plugin)
         .add_plugin(ui::Plugin)
         .add_plugin(pile::Plugin(GameState::Playing))
-        .add_plugin(card_effect::Plugin(GameState::Playing))
+        .add_plugin(game_flow::Plugin(GameState::Playing))
         .add_plugin(game_ui::Plugin(GameState::Playing))
         .add_system_set(GameState::Playing.on_enter(first_draw))
         .add_system_set(GameState::WaitLoaded.on_enter(setup_load_screen))
@@ -95,7 +95,7 @@ fn main() {
     app.run();
 }
 
-pub(crate) fn cleanup_marked<T: Component>(mut cmds: Commands, query: Query<Entity, With<T>>) {
+pub fn cleanup_marked<T: Component>(mut cmds: Commands, query: Query<Entity, With<T>>) {
     use bevy_debug_text_overlay::screen_print;
     screen_print!(sec: 3.0, "Cleaned up Something (can't show)");
     for entity in query.iter() {
