@@ -117,27 +117,28 @@ fn update_meshes(
     meshes_q: &mut Query<(&Handle<Mesh>, &mut Visibility)>,
 ) -> Option<()> {
     // 18 -> 0.124 ; -- 0 -> -0.9
-    use bevy::render::mesh::VertexAttributeValues::Float32x3;
-    let (player, mut player_vis) = meshes_q.get_mut(player).ok()?;
-    player_vis.is_visible = player_cards != 0;
-    let player = meshes.get_mut(player.clone())?;
-    if let Float32x3(positions) = player.attribute_mut(Mesh::ATTRIBUTE_POSITION)? {
-        for pos in positions.iter_mut().filter(|v| v[1] > -0.901) {
-            pos[1] = player_cards as f32 / 18.0 - 0.9;
+    use bevy::render::mesh::VertexAttributeValues::{Float32x2, Float32x3};
+    let mut update_deck = |entity, card_count| {
+        let (handle, mut visibility) = meshes_q.get_mut(entity).ok()?;
+        visibility.is_visible = card_count != 0;
+        let mesh = meshes.get_mut(handle.clone())?;
+        if let Float32x3(positions) = mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION)? {
+            for pos in positions.iter_mut().filter(|v| v[1] > -0.901) {
+                pos[1] = card_count as f32 / 18.0 - 0.9;
+            }
         }
-    }
-    let (oppo, mut oppo_vis) = meshes_q.get_mut(oppo).ok()?;
-    oppo_vis.is_visible = oppo_cards != 0;
-    let oppo = meshes.get_mut(oppo.clone())?;
-    if let Float32x3(positions) = oppo.attribute_mut(Mesh::ATTRIBUTE_POSITION)? {
-        for pos in positions.iter_mut().filter(|v| v[1] > -0.901) {
-            pos[1] = oppo_cards as f32 / 18.0 - 0.9;
+        if let Float32x2(uvs) = mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0)? {
+            for point in uvs.iter_mut().filter(|p| p[0] > 0.218 && p[1] > 0.001) {
+                point[1] = card_count as f32 / 18. + 0.002;
+            }
         }
-    }
+        Some(())
+    };
+    update_deck(player, player_cards)?;
+    update_deck(oppo, oppo_cards)?;
     Some(())
 }
 
-// TODO: also change UV
 fn resize_decks(
     player_parent: Query<(&Children, &PlayerDeck)>,
     oppo_parent: Query<(&Children, &OppoDeck)>,
