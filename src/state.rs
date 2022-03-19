@@ -1,15 +1,12 @@
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub enum GameState {
-    ScenePreload,
     MainMenu,
-    LoadScene,
+    /// Wait until the game scene is fully loaded if not already
+    WaitSceneLoaded,
+    /// The game is running
     Playing,
-    /// Gameover animation
-    GameOver,
     /// Restart menu after gameover
     RestartMenu,
-    /// In-game settings
-    PauseMenu,
 }
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]

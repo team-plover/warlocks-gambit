@@ -5,10 +5,11 @@ use bevy_debug_text_overlay::screen_print;
 use crate::{
     animate::Animated,
     card_effect::SeedCount,
-    card_spawner::{BirdPupil, BirdPupilRoot, GameStarts, GrabbedCard, PlayerSleeve},
+    card_spawner::{
+        BirdPupil, BirdPupilRoot, EndReason, GameOver, GameStarts, GrabbedCard, PlayerSleeve,
+    },
     game_ui::EffectEvent,
     state::GameState,
-    ui::gameover::GameOverKind,
 };
 
 #[derive(Debug)]
@@ -72,7 +73,7 @@ fn execute_cheat(
     sleeve: Query<&GlobalTransform, With<PlayerSleeve>>,
     game_starts: Res<GameStarts>,
     mut bird_eye: Query<&mut Animated, With<BirdPupilRoot>>,
-    mut gameover_events: EventWriter<GameOverKind>,
+    mut gameover_events: EventWriter<GameOver>,
     mut ui: EventWriter<EffectEvent>,
     mut watch: ResMut<BirdEye>,
     mut cmds: Commands,
@@ -92,8 +93,8 @@ fn execute_cheat(
                 }
             }
             CheatEvent::HideInSleeve(_) if watch.is_watching => {
-                screen_print!("you got caught cheating!");
-                gameover_events.send(GameOverKind::CheatSpotted);
+                screen_print!("caught cheating");
+                gameover_events.send(GameOver(EndReason::CaughtCheating));
             }
             CheatEvent::HideInSleeve(entity) => {
                 let mut target: Transform = (*sleeve.single()).into();

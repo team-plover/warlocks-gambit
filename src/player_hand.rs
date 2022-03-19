@@ -44,6 +44,8 @@ impl HandCard {
     }
 }
 
+// TODO: do not re-highlight the previously highlighted card until cursor has
+// been away from it for at least 0.3 seconds
 #[derive(SystemParam)]
 struct DrawParams<'w, 's> {
     card_spawner: SpawnCard<'w, 's>,

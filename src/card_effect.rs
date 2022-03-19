@@ -4,17 +4,17 @@
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::{Plugin as BevyPlugin, *};
+use bevy_debug_text_overlay::screen_print;
 
 use crate::{
     audio::AudioRequest,
     card::{Card, WordOfPower},
-    card_spawner::{CardOrigin, GameStarts, PlayedCard},
+    card_spawner::{CardOrigin, EndReason, GameOver, GameStarts, PlayedCard},
     cheat::SleeveCard,
     deck::{OppoDeck, PlayerDeck},
     game_ui::EffectEvent,
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
-    ui::gameover::GameOverKind,
     war::{BattleOutcome, Value},
     Participant,
 };
@@ -247,23 +247,23 @@ impl<'w, 's> CardStats<'w, 's> {
     }
 }
 
-#[allow(clippy::type_complexity)]
 fn handle_new_turn(
     mut initative: ResMut<Initiative>,
     mut turn: ResMut<State<TurnState>>,
     mut turn_count: ResMut<TurnCount>,
-    mut gameover_events: EventWriter<GameOverKind>,
+    mut gameover_events: EventWriter<GameOver>,
     hands: Query<(), HandFilter>,
     card_stats: CardStats,
 ) {
+    screen_print!(sec: 1.0, "handle new turn");
     let player_score = card_stats.player_score();
     let oppo_score = card_stats.oppo_score();
     let remaining_scores = card_stats.remaining_score();
     if player_score - oppo_score > remaining_scores {
-        gameover_events.send(GameOverKind::PlayerWon);
+        gameover_events.send(GameOver(EndReason::Victory));
         return;
     } else if oppo_score - player_score > remaining_scores {
-        gameover_events.send(GameOverKind::PlayerLost);
+        gameover_events.send(GameOver(EndReason::Loss));
         return;
     }
     turn_count.0 += 1;
@@ -343,7 +343,6 @@ pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         use TurnState::{OppoActivated, PlayerActivated};
-        let handle_new_turn = handle_new_turn.before("check_gameover");
         app.add_event::<ActivateCard>()
             .init_resource::<TurnCount>()
             .init_resource::<ScoreBonuses>()

@@ -1,6 +1,6 @@
 use bevy::math::Vec3Swizzles;
 use bevy::prelude::{Plugin as BevyPlugin, *};
-use bevy_ui_build_macros::{rect, size, unit};
+use bevy_ui_build_macros::{rect, size, style, unit};
 use bevy_ui_navigation::{systems as nav, Focused, NavigationPlugin};
 
 #[derive(Clone, Component, Default)]
@@ -13,25 +13,28 @@ impl MenuCursor {
         self.size = node.size * 1.05;
         self.position = transform.translation.xy() - self.size / 2.0;
     }
-}
-
-/// The root node of the main menu, to remove the menu when exiting it
-#[derive(Component, Clone)]
-pub struct MenuRoot;
-
-/// Add this system in menu-specific plugin with SystemSet::on_exit
-pub fn exit_menu(mut cmds: Commands, root: Query<Entity, With<MenuRoot>>) {
-    root.iter()
-        .for_each(|entity| cmds.entity(entity).despawn_recursive())
+    pub fn spawn_ui_element(cmds: &mut Commands) -> Entity {
+        cmds.spawn_bundle(NodeBundle {
+            style: style! { position_type: PositionType::Absolute, size: size!(0 pct, 0 pct), },
+            color: UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
+            ..Default::default()
+        })
+        .insert_bundle((Self::default(), Name::new("Cursor")))
+        .id()
+    }
 }
 
 pub struct UiAssets {
     pub font: Handle<Font>,
+    pub background_image: Handle<Image>,
 }
 impl FromWorld for UiAssets {
     fn from_world(world: &mut World) -> Self {
         let assets = world.get_resource::<AssetServer>().unwrap();
-        Self { font: assets.load("Boogaloo-Regular.otf") }
+        Self {
+            font: assets.load("Boogaloo-Regular.otf"),
+            background_image: assets.load("main_menu_bg.jpg"),
+        }
     }
 }
 
@@ -46,6 +49,14 @@ impl UiAssets {
     }
     pub fn large_text(&self, content: &str) -> TextBundle {
         self.text_bundle(content, 60.)
+    }
+    pub fn background(&self) -> ImageBundle {
+        use PositionType::Absolute;
+        ImageBundle {
+            image: self.background_image.clone().into(),
+            style: style! { position_type: Absolute, size: size!(auto, 100 pct), },
+            ..Default::default()
+        }
     }
 }
 
@@ -83,7 +94,6 @@ impl BevyPlugin for Plugin {
             .init_resource::<UiAssets>()
             .init_resource::<nav::InputMapping>()
             .add_system(nav::default_mouse_input)
-            .add_system(nav::default_gamepad_input)
             .add_system(update_highlight);
 
         app.add_startup_system(|mut cmds: Commands| {

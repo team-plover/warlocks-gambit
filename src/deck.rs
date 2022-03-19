@@ -1,5 +1,4 @@
 use bevy::prelude::{Plugin as BevyPlugin, *};
-use bevy_debug_text_overlay::screen_print;
 use bevy_scene_hook::SceneHook;
 
 use crate::{
@@ -103,6 +102,7 @@ impl OppoDeck {
     }
 }
 
+// TODO: also change UV
 fn resize_decks(
     player_parent: Query<&Children, With<card_spawner::PlayerDeck>>,
     oppo_parent: Query<&Children, With<card_spawner::OppoDeck>>,
@@ -114,9 +114,7 @@ fn resize_decks(
     use bevy::render::mesh::VertexAttributeValues::Float32x3;
     let (player, oppo) = (player_parent.single(), oppo_parent.single());
     if let (Ok(player), Ok(oppo)) = (meshes_q.get(player[0]), meshes_q.get(oppo[0])) {
-        screen_print!("changing deck sizes");
         if let Some(player) = meshes.get_mut(player.clone()) {
-            screen_print!("got the player mesh");
             // 18 -> 0.124
             // 0 -> -0.9
             let player_cards = player_deck.remaining() as f32;
@@ -127,7 +125,6 @@ fn resize_decks(
             }
         }
         if let Some(oppo) = meshes.get_mut(oppo.clone()) {
-            screen_print!("got the oppo mesh");
             // 18 -> 0.124
             // 0 -> -0.9
             let oppo_cards = oppo_deck.remaining() as f32;

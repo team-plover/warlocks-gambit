@@ -26,6 +26,15 @@ mod card_spawner {
     use super::Participant;
     use bevy::prelude::Component;
 
+    #[derive(Debug)]
+    pub struct GameOver(pub EndReason);
+    #[derive(Debug)]
+    pub enum EndReason {
+        Victory,
+        Loss,
+        CaughtCheating,
+    }
+
     #[derive(Default)]
     pub struct GameStarts(pub u32);
 
@@ -78,6 +87,9 @@ pub enum Participant {
     Oppo,
 }
 
+#[derive(Component, Clone)]
+struct WaitScreenRoot;
+
 use state::{GameState, TurnState};
 
 fn main() {
@@ -89,7 +101,7 @@ fn main() {
             vsync: false, // workaround for https://github.com/bevyengine/bevy/issues/1908 (seems to be Mesa bug with X11 + Vulkan)
             ..Default::default()
         })
-        .add_state(GameState::ScenePreload)
+        .add_state(GameState::MainMenu)
         .add_state(TurnState::Starting)
         .add_plugins(DefaultPlugins);
 
@@ -101,29 +113,38 @@ fn main() {
         .add_plugin(bevy_debug_text_overlay::OverlayPlugin::default())
         .add_plugin(player_hand::Plugin(GameState::Playing))
         .add_plugin(oppo_hand::Plugin(GameState::Playing))
-        .add_plugin(scene::Plugin(GameState::LoadScene))
+        .add_plugin(scene::Plugin)
         .add_plugin(deck::Plugin(GameState::Playing))
         .add_plugin(animate::Plugin)
         .add_plugin(cheat::Plugin(GameState::Playing))
         .add_plugin(audio::Plugin)
         .add_plugin(card::Plugin)
-        .add_plugin(ui::common::Plugin)
-        .add_plugin(ui::main_menu::Plugin(GameState::MainMenu))
-        .add_plugin(ui::gameover::Plugin)
-        .add_plugin(ui::restart_menu::Plugin)
-        //.add_plugin(ui::pause_menu::Plugin) // TODO: disable player control for this state
+        .add_plugin(ui::Plugin)
         .add_plugin(pile::Plugin(GameState::Playing))
         .add_plugin(card_effect::Plugin(GameState::Playing))
         .add_plugin(game_ui::Plugin(GameState::Playing))
-        .add_system(first_draw.with_run_criteria(State::on_enter(GameState::Playing)))
+        .add_system_set(SystemSet::on_enter(GameState::Playing).with_system(first_draw))
         .add_system_set(
-            SystemSet::on_exit(GameState::ScenePreload)
-                .with_system(setup)
-                .with_system(ui::common::exit_menu),
+            SystemSet::on_enter(GameState::WaitSceneLoaded).with_system(setup_load_screen),
         )
-        .add_startup_system(init_loading_message);
+        .add_system_set(
+            SystemSet::on_update(GameState::WaitSceneLoaded).with_system(complete_load_screen),
+        )
+        .add_system_set(
+            SystemSet::on_exit(GameState::WaitSceneLoaded)
+                .with_system(cleanup_marked::<WaitScreenRoot>),
+        )
+        .add_startup_system(setup);
 
     app.run();
+}
+
+pub(crate) fn cleanup_marked<T: Component>(mut cmds: Commands, query: Query<Entity, With<T>>) {
+    use bevy_debug_text_overlay::screen_print;
+    screen_print!(sec: 3.0, "Cleaned up Something (can't show)");
+    for entity in query.iter() {
+        cmds.entity(entity).despawn_recursive();
+    }
 }
 
 fn setup(
@@ -134,33 +155,35 @@ fn setup(
     audio_events.send(audio::AudioRequest::StartMusic);
 }
 
-fn init_loading_message(mut commands: Commands, ui_assets: Res<ui::common::UiAssets>) {
-    use bevy::prelude::*;
+fn complete_load_screen(
+    mut state: ResMut<State<GameState>>,
+    scene: Query<&bevy_scene_hook::SceneInstance<scene::Scene>>,
+) {
+    if scene.single().is_loaded() {
+        state.set(GameState::Playing).expect("no state issues");
+    }
+}
+fn setup_load_screen(
+    mut cmds: Commands,
+    assets: Res<ui::Assets>,
+    scene: Query<&bevy_scene_hook::SceneInstance<scene::Scene>>,
+) {
     use bevy_ui_build_macros::{build_ui, size, style, unit};
-    use ui::common::*;
-
-    let text = "Loading...";
-
-    let node = NodeBundle {
-        color: Color::NONE.into(),
-        style: style! {
-            flex_direction: FlexDirection::ColumnReverse,
-            align_items: AlignItems::Center,
-            align_self: AlignSelf::Center,
-
-            size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
-            position_type: PositionType::Absolute,
-            justify_content: JustifyContent::Center,
-        },
-        ..Default::default()
-    };
-
-    build_ui! {
-        #[cmd(commands)]
-        node{ min_size: size!(100 pct, 100 pct) }[;Name::new("root node"), MenuRoot](
-            node[ui_assets.large_text(text);]
-        )
-    };
+    if !scene.single().is_loaded() {
+        let node = NodeBundle::default();
+        build_ui! {
+            #[cmd(cmds)]
+            node {
+                flex_direction: FlexDirection::ColumnReverse,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                size: size!(100 pct, 100 pct)
+            }[; Name::new("Root loading screen node"), WaitScreenRoot] (
+                entity[ assets.background(); Name::new("Background") ],
+                entity[assets.large_text("Loading..."); ]
+            )
+        };
+    }
 }
 
 fn first_draw(
