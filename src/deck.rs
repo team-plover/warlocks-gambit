@@ -110,38 +110,46 @@ impl OppoDeck {
     }
 }
 
+fn update_meshes(
+    (player_cards, oppo_cards): (usize, usize),
+    (player, oppo): (Entity, Entity),
+    meshes: &mut Assets<Mesh>,
+    meshes_q: &mut Query<(&Handle<Mesh>, &mut Visibility)>,
+) -> Option<()> {
+    // 18 -> 0.124 ; -- 0 -> -0.9
+    use bevy::render::mesh::VertexAttributeValues::Float32x3;
+    let (player, _) = meshes_q.get_mut(player).ok()?;
+    let player = meshes.get_mut(player.clone())?;
+    if let Float32x3(positions) = player.attribute_mut(Mesh::ATTRIBUTE_POSITION)? {
+        for pos in positions.iter_mut().filter(|v| v[1] > -0.9) {
+            pos[1] = player_cards as f32 / 18.0 - 0.9;
+        }
+    }
+    let (oppo, _) = meshes_q.get_mut(oppo).ok()?;
+    let oppo = meshes.get_mut(oppo.clone())?;
+    if let Float32x3(positions) = oppo.attribute_mut(Mesh::ATTRIBUTE_POSITION)? {
+        for pos in positions.iter_mut().filter(|v| v[1] > -0.9) {
+            pos[1] = oppo_cards as f32 / 18.0 - 0.9;
+        }
+    }
+    Some(())
+}
+
 // TODO: also change UV
 fn resize_decks(
     player_parent: Query<(&Children, &PlayerDeck)>,
     oppo_parent: Query<(&Children, &OppoDeck)>,
-    meshes_q: Query<&Handle<Mesh>>,
+    mut meshes_q: Query<(&Handle<Mesh>, &mut Visibility)>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    use bevy::render::mesh::VertexAttributeValues::Float32x3;
     let (player, player_deck) = player_parent.single();
     let (oppo, oppo_deck) = oppo_parent.single();
-    if let (Ok(player), Ok(oppo)) = (meshes_q.get(player[0]), meshes_q.get(oppo[0])) {
-        if let Some(player) = meshes.get_mut(player.clone()) {
-            // 18 -> 0.124
-            // 0 -> -0.9
-            let player_cards = player_deck.remaining() as f32;
-            if let Some(Float32x3(positions)) = player.attribute_mut(Mesh::ATTRIBUTE_POSITION) {
-                for pos in positions.iter_mut().filter(|v| v[1] > -0.9) {
-                    pos[1] = player_cards / 18.0 - 0.9;
-                }
-            }
-        }
-        if let Some(oppo) = meshes.get_mut(oppo.clone()) {
-            // 18 -> 0.124
-            // 0 -> -0.9
-            let oppo_cards = oppo_deck.remaining() as f32;
-            if let Some(Float32x3(positions)) = oppo.attribute_mut(Mesh::ATTRIBUTE_POSITION) {
-                for pos in positions.iter_mut().filter(|v| v[1] > -0.9) {
-                    pos[1] = oppo_cards / 18.0 - 0.9;
-                }
-            }
-        }
-    }
+    update_meshes(
+        (player_deck.remaining(), oppo_deck.remaining()),
+        (player[0], oppo[0]),
+        &mut meshes,
+        &mut meshes_q,
+    );
 }
 
 fn reset_decks(mut player: Query<&mut PlayerDeck>, mut oppo: Query<&mut OppoDeck>) {
