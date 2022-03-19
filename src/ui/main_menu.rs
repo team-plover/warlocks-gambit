@@ -115,7 +115,7 @@ fn update_menu(
                     Ok(MainMenuElem::Start) => {
                         screen_print!("Player pressed the start button");
                         audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
-                        game_state.set(GameState::WaitSceneLoaded).unwrap();
+                        game_state.set(GameState::WaitLoaded).unwrap();
                     }
                     Ok(MainMenuElem::LockMouse) => {
                         let window = windows.get_primary_mut().expect(window_msg);
@@ -290,9 +290,10 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
+        use crate::system_helper::EasySystemSetCtor;
         app.init_resource::<MenuAssets>()
-            .add_system_set(SystemSet::on_enter(self.0).with_system(setup_main_menu))
-            .add_system_set(SystemSet::on_exit(self.0).with_system(cleanup_marked::<MainMenuRoot>))
+            .add_system_set(self.0.on_enter(setup_main_menu))
+            .add_system_set(self.0.on_exit(cleanup_marked::<MainMenuRoot>))
             .add_system_set(
                 SystemSet::on_update(self.0)
                     .with_system(update_sliders)

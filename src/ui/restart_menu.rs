@@ -4,11 +4,7 @@ use bevy::prelude::*;
 use bevy_ui_build_macros::{build_ui, size, style, unit};
 use bevy_ui_navigation::{Focusable, NavEvent, NavRequest};
 
-use crate::{
-    card_spawner::{EndReason, GameOver},
-    cleanup_marked,
-    state::GameState,
-};
+use crate::{cleanup_marked, state::GameState, EndReason, GameOver};
 
 struct RestartAssets {
     defeat: Handle<Image>,
@@ -117,12 +113,10 @@ fn continue_on_space(mut keys: ResMut<Input<KeyCode>>, mut state: ResMut<State<G
 pub struct Plugin;
 impl bevy::app::Plugin for Plugin {
     fn build(&self, app: &mut App) {
+        use crate::system_helper::EasySystemSetCtor;
         app.init_resource::<RestartAssets>().add_event::<GameOver>();
         app.add_system(handle_gameover_event);
-        app.add_system_set(
-            SystemSet::on_exit(GameState::RestartMenu)
-                .with_system(cleanup_marked::<RestartMenuRoot>),
-        );
+        app.add_system_set(GameState::RestartMenu.on_exit(cleanup_marked::<RestartMenuRoot>));
         app.add_system_set(
             SystemSet::on_update(GameState::RestartMenu)
                 .with_system(update)

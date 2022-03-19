@@ -3,14 +3,19 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_debug_text_overlay::screen_print;
 
 use crate::{
-    animate::Animated,
-    card_effect::SeedCount,
-    card_spawner::{
-        BirdPupil, BirdPupilRoot, EndReason, GameOver, GameStarts, GrabbedCard, PlayerSleeve,
-    },
-    game_ui::EffectEvent,
-    state::GameState,
+    animate::Animated, game_flow::SeedCount, game_ui::EffectEvent, player_hand::GrabbedCard,
+    state::GameState, EndReason, GameOver, GameStarts,
 };
+
+#[derive(Component)]
+pub struct BirdPupilRoot;
+
+#[derive(Component)]
+pub struct BirdPupil;
+
+/// Where to stash cards added to sleeve
+#[derive(Component)]
+pub struct PlayerSleeve;
 
 #[derive(Debug)]
 pub enum CheatEvent {
@@ -40,8 +45,7 @@ fn use_seed(
     mut ui: EventWriter<EffectEvent>,
     input: Res<Input<KeyCode>>,
 ) {
-    if input.just_pressed(KeyCode::Space) && seed.count() != 0 {
-        assert!(seed.consume());
+    if input.just_pressed(KeyCode::Space) && seed.consume() {
         cheats.send(CheatEvent::ConfuseBird);
         ui.send(EffectEvent::UseSeed);
     }

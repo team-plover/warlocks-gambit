@@ -13,13 +13,19 @@ use crate::{
     audio::AudioRequest::{self, PlayShuffleLong, PlayShuffleShort},
     camera::PlayerCam,
     card::{Card, CardStatus, SpawnCard},
-    card_effect::ActivateCard,
-    card_spawner::{GrabbedCard, PlayerHand},
     cheat::{CheatEvent, SleeveCard},
-    deck::PlayerDeck,
+    deck::PlayerDeckRes,
+    game_flow::PlayCard,
     state::{GameState, TurnState},
     Participant,
 };
+
+/// Position of the hand of the player
+#[derive(Component)]
+pub struct PlayerHand;
+
+#[derive(Component)]
+pub struct GrabbedCard;
 
 enum HandRaycast {}
 
@@ -50,7 +56,7 @@ impl HandCard {
 struct DrawParams<'w, 's> {
     card_spawner: SpawnCard<'w, 's>,
     meshes: ResMut<'w, Assets<Mesh>>,
-    deck: ResMut<'w, PlayerDeck>,
+    deck: ResMut<'w, PlayerDeckRes>,
     audio: EventWriter<'w, 's, AudioRequest>,
 }
 impl<'w, 's> DrawParams<'w, 's> {
@@ -103,7 +109,7 @@ fn update_raycast(
     }
 }
 
-/// Set the [`HoveredCard`] as the last one on which the cursor hovered.
+/// Set the [`HoverStatus`] of cards
 fn select_card(
     mut cursor: EventReader<CursorMoved>,
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
@@ -140,7 +146,7 @@ enum HandEvent {
 fn play_card(
     mouse: Res<Input<MouseButton>>,
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
-    mut card_events: EventWriter<ActivateCard>,
+    mut card_events: EventWriter<PlayCard>,
     mut cmds: Commands,
     mut hand_cards: Query<(Entity, &mut Card, &mut HandCard, &mut Transform)>,
     mut hand_events: EventWriter<HandEvent>,
@@ -176,7 +182,7 @@ fn play_card(
                     card.set_status(CardStatus::Normal);
                     cmds.entity(entity).remove::<HandCard>();
                     cmds.entity(entity).remove::<RayCastMesh<HandRaycast>>();
-                    card_events.send(ActivateCard::new(entity, Participant::Player));
+                    card_events.send(PlayCard::new(entity, Participant::Player));
                 } else {
                     hand_card.hover = HoverStatus::None;
                 }

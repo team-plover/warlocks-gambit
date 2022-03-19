@@ -5,14 +5,16 @@ use fastrand::usize as randusize;
 
 use crate::{
     card::{Card, SpawnCard, WordOfPower},
-    card_effect::ActivateCard,
-    card_spawner::{OppoHand, PlayedCard},
-    deck::OppoDeck,
-    // pile::{Pile, PileCard, PileType},
+    deck::OppoDeckRes,
+    game_flow::{PlayCard, PlayedCard},
     state::{GameState, TurnState},
     war::BattleOutcome,
     Participant,
 };
+
+/// Position of the hand of the opposition
+#[derive(Component)]
+pub struct OppoHand;
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component)]
@@ -25,7 +27,7 @@ impl OppoCard {
     }
 }
 
-fn draw_hand(mut card_spawner: SpawnCard, mut deck: ResMut<OppoDeck>) {
+fn draw_hand(mut card_spawner: SpawnCard, mut deck: ResMut<OppoDeckRes>) {
     for (i, card) in deck.draw(3).into_iter().enumerate() {
         card_spawner
             .spawn_card(card, Participant::Oppo)
@@ -38,7 +40,6 @@ fn update_oppo_hand(
     mut cards: Query<(&mut Transform, &OppoCard)>,
     time: Res<Time>,
 ) {
-    // TODO: subtile go up/down hover effect
     let card_speed = 10.0 * time.delta_seconds();
     let hand_transform = oppo_hand.single();
     let hand_pos = hand_transform.translation;
@@ -56,11 +57,9 @@ fn update_oppo_hand(
 
 fn chose_card(
     mut cmds: Commands,
-    mut card_events: EventWriter<ActivateCard>,
+    mut card_events: EventWriter<PlayCard>,
     cards: Query<(Entity, &Card), With<OppoCard>>,
     war_card: Query<&Card, With<PlayedCard>>,
-    // pile_cards: Query<&PileCard>,
-    // pile: Query<&Pile>,
 ) {
     use BattleOutcome::{Loss, Win};
     use WordOfPower::Zihbm;
@@ -97,16 +96,17 @@ fn chose_card(
         }
     };
     cmds.entity(selected).remove::<OppoCard>();
-    card_events.send(ActivateCard::new(selected, Participant::Oppo));
+    card_events.send(PlayCard::new(selected, Participant::Oppo));
 }
 
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
+        use crate::system_helper::EasySystemSetCtor;
         #[cfg(feature = "debug")]
         app.register_inspectable::<OppoCard>();
-        app.add_system_set(SystemSet::on_enter(TurnState::Draw).with_system(draw_hand))
-            .add_system_set(SystemSet::on_enter(TurnState::Oppo).with_system(chose_card))
-            .add_system_set(SystemSet::on_update(self.0).with_system(update_oppo_hand));
+        app.add_system_set(TurnState::Draw.on_enter(draw_hand))
+            .add_system_set(TurnState::Oppo.on_enter(chose_card))
+            .add_system_set(self.0.on_update(update_oppo_hand));
     }
 }

@@ -3,11 +3,16 @@ use bevy_scene_hook::SceneHook;
 
 use crate::{
     card::{Card, WordOfPower},
-    card_spawner,
     scene::Scene,
     state::GameState,
     war::Value,
 };
+
+#[derive(Component)]
+pub struct PlayerDeck;
+
+#[derive(Component)]
+pub struct OppoDeck;
 
 struct Deck {
     cards: Vec<Card>,
@@ -70,9 +75,9 @@ macro_rules! cards {
     (@word z) => (Some(WordOfPower::Geh)); // 0 -> 12
 }
 
-pub struct PlayerDeck(Deck);
-impl_deck_methods!(PlayerDeck);
-impl PlayerDeck {
+pub struct PlayerDeckRes(Deck);
+impl_deck_methods!(PlayerDeckRes);
+impl PlayerDeckRes {
     #[rustfmt::skip]
     fn new() -> Self {
         Self(cards![
@@ -86,9 +91,9 @@ impl PlayerDeck {
     }
 }
 
-pub struct OppoDeck(Deck);
-impl_deck_methods!(OppoDeck);
-impl OppoDeck {
+pub struct OppoDeckRes(Deck);
+impl_deck_methods!(OppoDeckRes);
+impl OppoDeckRes {
     #[rustfmt::skip]
     fn new() -> Self {
         Self(cards![
@@ -104,11 +109,11 @@ impl OppoDeck {
 
 // TODO: also change UV
 fn resize_decks(
-    player_parent: Query<&Children, With<card_spawner::PlayerDeck>>,
-    oppo_parent: Query<&Children, With<card_spawner::OppoDeck>>,
+    player_parent: Query<&Children, With<PlayerDeck>>,
+    oppo_parent: Query<&Children, With<OppoDeck>>,
     meshes_q: Query<&Handle<Mesh>>,
-    player_deck: Res<PlayerDeck>,
-    oppo_deck: Res<OppoDeck>,
+    player_deck: Res<PlayerDeckRes>,
+    oppo_deck: Res<OppoDeckRes>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     use bevy::render::mesh::VertexAttributeValues::Float32x3;
@@ -140,13 +145,13 @@ fn resize_decks(
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(OppoDeck::new())
-            .insert_resource(PlayerDeck::new())
+        app.insert_resource(OppoDeckRes::new())
+            .insert_resource(PlayerDeckRes::new())
             .add_system(resize_decks.with_run_criteria(Scene::when_spawned))
             .add_system_set(
                 SystemSet::on_exit(self.0).with_system(|mut cmds: Commands| {
-                    cmds.insert_resource(OppoDeck::new());
-                    cmds.insert_resource(PlayerDeck::new());
+                    cmds.insert_resource(OppoDeckRes::new());
+                    cmds.insert_resource(PlayerDeckRes::new());
                 }),
             );
     }

@@ -14,11 +14,15 @@ use bevy::render::{
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use enum_map::{enum_map, Enum, EnumMap};
 
-use crate::{
-    card_spawner::{CardOrigin, OppoCardSpawner, PlayerCardSpawner},
-    war::Value,
-    Participant,
-};
+use crate::{war::Value, CardOrigin, Participant};
+
+/// Component attached to where the opponent draws cards from.
+#[derive(Component)]
+pub struct OppoCardSpawner;
+
+/// Component attached to where the player draws cards from.
+#[derive(Component)]
+pub struct PlayerCardSpawner;
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Enum, Clone, Copy, Debug, PartialEq)]

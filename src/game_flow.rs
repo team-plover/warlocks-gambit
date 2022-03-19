@@ -1,6 +1,92 @@
-//! What happens after activating a card (including win/loss conditions and
-//! score tracking, this module should be renamed into "game_state" or
-//! something)
+//! Game flow driver, manages how cards are played, when it is possible to
+//! play them and who can play them. Also manages score and card effects.
+//!
+//! # Architecture
+//!
+//! This module does:
+//! * Manage game state transitions (see [#Transitions] section).
+//! * Compute points obtained in a turn and distribute cards from the war pile
+//!   into their corresponding piles in accordance to the game rules, see
+//!   [#Scores] section.
+//!   * This includes keeping track of the effects active for this turn.
+//!   * This includes providing an API to let other modules access the party
+//!     scores, and therefore keeping track of the points.
+//!
+//! ## Transitions
+//!
+//! Note that the game enters [`TurnState::New`] whenever who is playing a card
+//! changes.
+//!
+//! * [`handle_new_turn`]: end game if one of the players cannot win
+//! * [`complete_draw`]: Set who's turn it is to play after drawing cards
+//! * [`handle_played`]: Handle effects based on played card and enter
+//!   `CardPlayed` state.
+//! * [`wait_active`]: Wait a little time after a card is played
+//! * [`handle_turn_end`]: Start new turn after swapping initiative,
+//!   if two cards are played, update scores and distribute cards to
+//!   the winner's pile.
+//!
+//! Following is the flowchart of the game logic, states are from the
+//! [`TurnState`] `enum`.
+//!
+//! ### Flowchart
+//! ```text
+//!                   init
+//!                    ↓
+//!               -----------
+//!               |New State|←-------------------------------←
+//!               -----------                                |
+//! -------------------|--------------------------------     |
+//! |handle_new_turn   |                               |     |
+//! |                  ↓                               |     |
+//! |      has one of the players won?-→ no            |     |
+//! |         ↓                          ↓             |     |
+//! |        yes           are the players hand empty? |     |
+//! |         |                ↓                 |     |     |
+//! |         |               yes                no    |     |
+//! ----------|----------------|-----------------|------     |
+//!           ↓                ↓                 |           |
+//!   ----------------    ------------           |           |
+//!   |GameOver state|    |Draw state|           |           |
+//!   ----------------    ------------           |           |
+//!                            ↓                 |           |
+//!             -----------------------------    |           |
+//!             |complete_draw              |    |           |
+//!             | wait until all cards drawn|    |           |
+//!             -----------------------------    ↓           |
+//!                            |    -----------------------  |
+//!                            →---→|(Player | Oppo) State|  |
+//!                                 -----------------------  |
+//!                                            ↓             |
+//!   ---------------------------------------------------    |
+//!   | oppo_hand or player_hand send an PlayCard event |    |
+//!   ---------------------------------------------------    |
+//!                           ↓                              |
+//!                      handle_played                       |
+//!                           ↓                              |
+//!                  --------------------                    |
+//!                  | CardPlayed State |                    |
+//!                  --------------------                    |
+//!                           ↓                              |
+//!                      wait_active--→ handle_turn_end→-----↑
+//! ```
+//!
+//! ## Scores
+//!
+//! Player and opposition scores are tracked in this module. The
+//! [`handle_turn_end`] system computes the points at the end of each "Battle"
+//! according to specification in [crate::war] module and hands out point
+//! bonuses based on played card [`WordOfPower`]s. Currently only four words
+//! are handled. See [`handle_turn_end`] docs for specifics.
+//!
+//! The module provides the [`CardStats`] system parameter for other modules
+//! to query the game scores.
+//!
+//! ## Effects
+//!
+//! The [`handle_played`] system adds card effects to the [`TurnEffects`] or
+//! directly updates the [`SeedCount`] resource when an [`PlayCard`] event
+//! is received, it then enters [`TurnState::CardPlayed`].
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::{Plugin as BevyPlugin, *};
@@ -9,16 +95,20 @@ use bevy_debug_text_overlay::screen_print;
 use crate::{
     audio::AudioRequest,
     card::{Card, WordOfPower},
-    card_spawner::{CardOrigin, EndReason, GameOver, GameStarts, PlayedCard},
     cheat::SleeveCard,
-    deck::{OppoDeck, PlayerDeck},
+    deck::{OppoDeckRes, PlayerDeckRes},
     game_ui::EffectEvent,
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
     war::{BattleOutcome, Value},
-    Participant,
+    CardOrigin, EndReason, GameOver, GameStarts, Participant,
 };
 
+/// Card in the War pile played by the player
+#[derive(Component)]
+pub struct PlayedCard;
+
+/// Who is playing a card currently
 pub struct Initiative(Participant);
 impl Initiative {
     fn swap(&mut self) {
@@ -29,19 +119,30 @@ impl Initiative {
     }
 }
 
-pub struct ActivateCard {
+/// Play a card.
+///
+/// Used by sending an `PlayCard` event to an `EventWriter<PlayCard>`.
+/// See [`handle_played`] for what happens when a card is played.
+pub struct PlayCard {
     pub card: Entity,
     pub who: Participant,
 }
-impl ActivateCard {
+impl PlayCard {
     pub fn new(card: Entity, who: Participant) -> Self {
         Self { card, who }
     }
 }
 
+/// Active effects.
+///
+/// It is updated in [`handle_played`] when a card is played. It is read and
+/// reset in [`handle_turn_end`] when each player has played a card.
 struct TurnEffects {
+    /// Winning card is swapped.
     swap: bool,
+    /// Bonus multiplier of card values.
     multiplier: i32,
+    /// The value of card of [`Value::Zero`] is 12.
     zero_bonus: bool,
 }
 impl Default for TurnEffects {
@@ -50,6 +151,8 @@ impl Default for TurnEffects {
     }
 }
 impl TurnEffects {
+    /// Add the effect corresponding to the given [`WordOfPower`] to effects
+    /// this turn.
     fn add(&mut self, word: WordOfPower) {
         use WordOfPower::*;
         match word {
@@ -61,6 +164,8 @@ impl TurnEffects {
     }
 }
 
+/// Keep track of extra points obtained from card effects. The "regular"
+/// points are kept track of in the player and oppo [`Pile`]s.
 #[derive(Default)]
 pub struct ScoreBonuses {
     player: i32,
@@ -75,6 +180,7 @@ impl ScoreBonuses {
     }
 }
 
+/// How many seeds the player has.
 #[derive(Default)]
 pub struct SeedCount(usize);
 impl SeedCount {
@@ -95,8 +201,19 @@ impl SeedCount {
 #[derive(Default)]
 pub struct TurnCount(pub usize);
 
-fn handle_activated(
-    mut events: EventReader<ActivateCard>,
+/// Handle [`PlayCard`] events.
+///
+/// Adds card effects from the [`PlayCard::card`] to the [`TurnEffects`] or
+/// directly updates the [`SeedCount`] resource when an [`PlayCard`] event
+/// is received, move the card to the war [`Pile`], and then enter the active
+/// [`TurnState`] corresponding to [`PlayCard::who`] played the card.
+///
+/// ## Card effects
+///
+/// * `Egeq`: Give an extra seed to the player.
+/// * `Qube`, `Zihbm` and `Geh`: See [`TurnEffects::add`].
+fn handle_played(
+    mut events: EventReader<PlayCard>,
     mut ui_events: EventWriter<EffectEvent>,
     mut cmds: Commands,
     mut pile: Query<&mut Pile>,
@@ -110,11 +227,9 @@ fn handle_activated(
 ) {
     use PileType::War;
     use WordOfPower::*;
-    for ActivateCard { card, who } in events.iter() {
-        let mut pile = pile
-            .iter_mut()
-            .find(|p| p.which == War)
-            .expect("War pile exists");
+    for PlayCard { card, .. } in events.iter() {
+        let msg = "War pile exists";
+        let mut pile = pile.iter_mut().find(|p| p.which == War).expect(msg);
         cmds.entity(*card)
             .insert_bundle((pile.additional_card(), PlayedCard));
         let card_word = cards.get(*card).map(|c| c.word);
@@ -137,18 +252,18 @@ fn handle_activated(
             Ok(Some(Geh)) => turn_effects.add(Geh),
             _ => {}
         }
-        let new_state = match who {
-            Participant::Oppo => TurnState::OppoActivated,
-            Participant::Player => TurnState::PlayerActivated,
-        };
-        turn.set(new_state).unwrap();
+        turn.set(TurnState::CardPlayed).unwrap();
     }
 }
 
+/// Handle what happens after a card is played
+///
+/// If there is exactly two cards in the war pile, compute results, move cards
+/// to the winner pile(s) and add any bonus points to [`ScoreBonuses`] if
+/// any card effects were in play this turn. Then enter new turn.
 fn handle_turn_end(
     cards: Query<(&PileCard, &CardOrigin, &Card, Entity)>,
     mut piles: Query<&mut Pile>,
-    mut turn: ResMut<State<TurnState>>,
     mut cmds: Commands,
     mut turn_effects: ResMut<TurnEffects>,
     mut score_bonuses: ResMut<ScoreBonuses>,
@@ -164,11 +279,9 @@ fn handle_turn_end(
                 .insert(pile.additional_card())
                 .remove::<PlayedCard>();
             let multi = turn_effects.multiplier - 1;
-            let zero_bonus = if card.value == Value::Zero && turn_effects.zero_bonus {
-                12
-            } else {
-                0
-            };
+            // TODO: this is broken with the SWAP modifier I think?
+            let zero_bonus = card.value == Value::Zero && turn_effects.zero_bonus;
+            let zero_bonus = if zero_bonus { 12 } else { 0 };
             score_bonuses.add_to_owner($who, (card.value as i32) * multi);
             score_bonuses.add_to_owner($who, zero_bonus * (multi + 1));
         };
@@ -199,8 +312,6 @@ fn handle_turn_end(
                 }
             }
             *turn_effects = TurnEffects::default();
-            let err_msg = "handle_turn_end only activated when in '*Activated' state";
-            turn.set(TurnState::New).expect(err_msg);
         }
         [] | [_] => {}
         _ => {
@@ -209,16 +320,22 @@ fn handle_turn_end(
     }
 }
 
-// Sets of cards that are not in piles (aka: in hand)
+/// Sets of cards that are not in piles (aka: in hand)
 type HandFilter = (With<CardOrigin>, Without<PileCard>, Without<SleeveCard>);
 
+/// Query scores.
+///
+/// A [`Participant`]'s score is exactly the [`Value`] of cards in their
+/// [`Pile`] plus any bonus points earned with [`WordOfPower`]s. Since it is
+/// not trivial to compute it, this `SystemParam` let you query the scores
+/// through its methods.
 #[derive(SystemParam)]
 pub struct CardStats<'w, 's> {
     piles: Query<'w, 's, (&'static PileCard, &'static Card)>,
     hands: Query<'w, 's, &'static Card, HandFilter>,
     sleeve: Query<'w, 's, &'static Card, With<SleeveCard>>,
-    player_deck: Res<'w, PlayerDeck>,
-    oppo_deck: Res<'w, OppoDeck>,
+    player_deck: Res<'w, PlayerDeckRes>,
+    oppo_deck: Res<'w, OppoDeckRes>,
     score_bonuses: Res<'w, ScoreBonuses>,
 }
 impl<'w, 's> CardStats<'w, 's> {
@@ -247,6 +364,7 @@ impl<'w, 's> CardStats<'w, 's> {
     }
 }
 
+/// Check for score-based lose/win conditions and enter selection state.
 fn handle_new_turn(
     mut initative: ResMut<Initiative>,
     mut turn: ResMut<State<TurnState>>,
@@ -255,7 +373,7 @@ fn handle_new_turn(
     hands: Query<(), HandFilter>,
     card_stats: CardStats,
 ) {
-    screen_print!(sec: 1.0, "handle new turn");
+    screen_print!(sec: 1.0, "handle turn n*{}", turn_count.0);
     let player_score = card_stats.player_score();
     let oppo_score = card_stats.oppo_score();
     let remaining_scores = card_stats.remaining_score();
@@ -268,16 +386,16 @@ fn handle_new_turn(
     }
     turn_count.0 += 1;
     initative.swap();
-    if hands.iter().count() == 0 {
-        turn.set(TurnState::Draw).unwrap();
-    } else {
-        match initative.0 {
-            Participant::Oppo => turn.set(TurnState::Oppo).unwrap(),
-            Participant::Player => turn.set(TurnState::Player).unwrap(),
-        };
-    }
+    // TODO: use size_hint once bevy#4244 is merged (https://github.com/bevyengine/bevy/pull/4244)
+    match initative.0 {
+        _ if hands.iter().count() == 0 => turn.set(TurnState::Draw).unwrap(),
+        Participant::Oppo => turn.set(TurnState::Oppo).unwrap(),
+        Participant::Player => turn.set(TurnState::Player).unwrap(),
+    };
 }
 
+/// Wait until all cards are drawn by the two participants and then enter the
+/// card selection state.
 fn complete_draw(
     initative: Res<Initiative>,
     mut turn: ResMut<State<TurnState>>,
@@ -291,35 +409,25 @@ fn complete_draw(
     }
 }
 
-#[derive(SystemParam)]
-struct ActiveParams<'w, 's> {
-    turn: ResMut<'w, State<TurnState>>,
-    time: Res<'w, Time>,
-    timeout: Local<'s, Option<f64>>,
-}
-
-fn handle_generic_active(goes_into: TurnState, mut params: ActiveParams) {
+fn wait_active(
+    mut turn: ResMut<State<TurnState>>,
+    mut timeout: Local<Option<f64>>,
+    time: Res<Time>,
+) {
     const TURN_INTERLUDE: f64 = 0.5;
-    match *params.timeout {
-        Some(some_timeout) if some_timeout < params.time.seconds_since_startup() => {
-            params.turn.set(goes_into).unwrap();
-            *params.timeout = None;
+    match *timeout {
+        Some(some_timeout) if some_timeout < time.seconds_since_startup() => {
+            turn.set(TurnState::New).unwrap();
+            *timeout = None;
         }
         None => {
-            *params.timeout = Some(params.time.seconds_since_startup() + TURN_INTERLUDE);
+            *timeout = Some(time.seconds_since_startup() + TURN_INTERLUDE);
         }
         _ => {}
     };
 }
 
-fn handle_player_active(params: ActiveParams) {
-    handle_generic_active(TurnState::Oppo, params);
-}
-
-fn handle_oppo_active(params: ActiveParams) {
-    handle_generic_active(TurnState::Player, params);
-}
-
+/// Remove all entities related to the game and resets resource values.
 fn cleanup(
     mut cmds: Commands,
     all_cards: Query<Entity, With<Card>>,
@@ -342,20 +450,18 @@ fn cleanup(
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
-        use TurnState::{OppoActivated, PlayerActivated};
-        app.add_event::<ActivateCard>()
+        use crate::system_helper::EasySystemSetCtor;
+        app.add_event::<PlayCard>()
             .init_resource::<TurnCount>()
             .init_resource::<ScoreBonuses>()
             .init_resource::<TurnEffects>()
             .init_resource::<SeedCount>()
             .insert_resource(Initiative(Participant::Player))
-            .add_system_set(SystemSet::on_update(self.0).with_system(handle_activated))
-            .add_system_set(SystemSet::on_enter(TurnState::New).with_system(handle_new_turn))
-            .add_system_set(SystemSet::on_update(TurnState::Draw).with_system(complete_draw))
-            .add_system_set(SystemSet::on_exit(PlayerActivated).with_system(handle_turn_end))
-            .add_system_set(SystemSet::on_exit(OppoActivated).with_system(handle_turn_end))
-            .add_system_set(SystemSet::on_exit(self.0).with_system(cleanup))
-            .add_system_set(SystemSet::on_update(PlayerActivated).with_system(handle_player_active))
-            .add_system_set(SystemSet::on_update(OppoActivated).with_system(handle_oppo_active));
+            .add_system_set(self.0.on_update(handle_played))
+            .add_system_set(self.0.on_exit(cleanup))
+            .add_system_set(TurnState::New.on_enter(handle_new_turn))
+            .add_system_set(TurnState::Draw.on_update(complete_draw))
+            .add_system_set(TurnState::CardPlayed.on_update(wait_active))
+            .add_system_set(TurnState::CardPlayed.on_exit(handle_turn_end));
     }
 }

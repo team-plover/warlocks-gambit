@@ -7,11 +7,12 @@ use bevy_scene_hook::{SceneHook, SceneInstance};
 use crate::{
     animate::Animated,
     camera::PlayerCam,
-    card_spawner::{
-        BirdPupil, BirdPupilRoot, OppoCardSpawner, OppoDeck, OppoHand, PlayerCardSpawner,
-        PlayerDeck, PlayerHand, PlayerSleeve,
-    },
+    card::{OppoCardSpawner, PlayerCardSpawner},
+    cheat::{BirdPupil, BirdPupilRoot, PlayerSleeve},
+    deck::{OppoDeck, PlayerDeck},
+    oppo_hand::OppoHand,
     pile::{Pile, PileType},
+    player_hand::PlayerHand,
 };
 
 pub enum Scene {}
@@ -39,11 +40,6 @@ impl SceneHook for Scene {
             _ => cmds,
         };
     }
-}
-
-#[derive(Default)]
-pub struct ScenePreload {
-    pub game: Handle<bevy::prelude::Scene>,
 }
 
 fn load_scene(

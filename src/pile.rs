@@ -29,7 +29,6 @@ pub struct Pile {
     pub which: PileType,
 }
 impl Pile {
-    // TODO: account for Participant when throwing into the war pile
     pub fn additional_card(&mut self) -> PileCard {
         let Self { stack_size, which } = *self;
         self.stack_size += 1;
@@ -66,10 +65,8 @@ fn move_to_pile(
 ) {
     let card_speed = 10.0 * time.delta_seconds();
     for (mut transform, PileCard { offset, stack_pos, which }) in cards.iter_mut() {
-        let (pile_transform, _) = pile
-            .iter()
-            .find(|p| &p.1.which == which)
-            .expect("Pile exists");
+        let msg = "Pile exists";
+        let (pile_transform, _) = pile.iter().find(|p| &p.1.which == which).expect(msg);
         let pile_pos = pile_transform.translation;
         let target = pile_pos + offset.translation + Vec3::Y * 0.012 * *stack_pos as f32;
         let origin = transform.translation;
