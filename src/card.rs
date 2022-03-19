@@ -72,6 +72,16 @@ pub struct Card {
     pub value: Value,
     status: CardStatus,
 }
+#[cfg(feature = "debug")]
+impl Default for Card {
+    fn default() -> Self {
+        Self {
+            word: None,
+            value: Value::Zero,
+            status: CardStatus::Normal,
+        }
+    }
+}
 impl Card {
     pub fn new(word: Option<WordOfPower>, value: Value) -> Self {
         let status = CardStatus::Normal;

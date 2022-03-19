@@ -5,7 +5,7 @@ use fastrand::usize as randusize;
 
 use crate::{
     card::{Card, SpawnCard, WordOfPower},
-    deck::OppoDeckRes,
+    deck::OppoDeck,
     game_flow::{PlayCard, PlayedCard},
     state::{GameState, TurnState},
     war::BattleOutcome,
@@ -27,8 +27,8 @@ impl OppoCard {
     }
 }
 
-fn draw_hand(mut card_spawner: SpawnCard, mut deck: ResMut<OppoDeckRes>) {
-    for (i, card) in deck.draw(3).into_iter().enumerate() {
+fn draw_hand(mut card_spawner: SpawnCard, mut deck: Query<&mut OppoDeck>) {
+    for (i, card) in deck.single_mut().draw(3).into_iter().enumerate() {
         card_spawner
             .spawn_card(card, Participant::Oppo)
             .insert(OppoCard::new(i));

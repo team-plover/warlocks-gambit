@@ -14,7 +14,7 @@ use crate::{
     camera::PlayerCam,
     card::{Card, CardStatus, SpawnCard},
     cheat::{CheatEvent, SleeveCard},
-    deck::PlayerDeckRes,
+    deck::PlayerDeck,
     game_flow::PlayCard,
     state::{GameState, TurnState},
     Participant,
@@ -56,13 +56,16 @@ impl HandCard {
 struct DrawParams<'w, 's> {
     card_spawner: SpawnCard<'w, 's>,
     meshes: ResMut<'w, Assets<Mesh>>,
-    deck: ResMut<'w, PlayerDeckRes>,
+    deck: Query<'w, 's, &'static mut PlayerDeck>,
     audio: EventWriter<'w, 's, AudioRequest>,
 }
 impl<'w, 's> DrawParams<'w, 's> {
+    fn deck(&mut self) -> Mut<PlayerDeck> {
+        self.deck.single_mut()
+    }
     fn draw(&mut self, count: usize) {
         self.audio.send(PlayShuffleLong);
-        for (i, card) in self.deck.draw(count).into_iter().enumerate() {
+        for (i, card) in self.deck().draw(count).into_iter().enumerate() {
             self.card_spawner
                 .spawn_card(card, Participant::Player)
                 .insert_bundle((
@@ -169,7 +172,7 @@ fn play_card(
             Dragging if mouse.just_released(MouseButton::Left) => {
                 let intersection = if let Ok(Some((_, i))) = query { i } else { break };
                 let cursor_pos = intersection.position();
-                let cards_remaining = card_drawer.deck.remaining() != 0;
+                let cards_remaining = card_drawer.deck().remaining() != 0;
                 let can_sleeve = sleeve_cards.iter().count() < 3 && cards_remaining;
                 cmds.entity(entity).remove::<GrabbedCard>();
                 if cursor_pos.x < -1.0 && cursor_pos.y < 4.7 && can_sleeve {
@@ -191,7 +194,7 @@ fn play_card(
             Dragging => {
                 let intersection = if let Ok(Some((_, i))) = query { i } else { break };
                 let cursor_pos = intersection.position();
-                let cards_remaining = card_drawer.deck.remaining() != 0;
+                let cards_remaining = card_drawer.deck().remaining() != 0;
                 let can_sleeve = sleeve_cards.iter().count() < 3 && cards_remaining;
                 trans.translation = cursor_pos;
                 if cursor_pos.x < -1.0 && cursor_pos.y < 4.7 && can_sleeve {

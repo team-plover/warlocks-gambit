@@ -96,7 +96,7 @@ use crate::{
     audio::AudioRequest,
     card::{Card, WordOfPower},
     cheat::SleeveCard,
-    deck::{OppoDeckRes, PlayerDeckRes},
+    deck::{OppoDeck, PlayerDeck},
     game_ui::EffectEvent,
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
@@ -334,15 +334,17 @@ pub struct CardStats<'w, 's> {
     piles: Query<'w, 's, (&'static PileCard, &'static Card)>,
     hands: Query<'w, 's, &'static Card, HandFilter>,
     sleeve: Query<'w, 's, &'static Card, With<SleeveCard>>,
-    player_deck: Res<'w, PlayerDeckRes>,
-    oppo_deck: Res<'w, OppoDeckRes>,
+    player_deck: Query<'w, 's, &'static PlayerDeck>,
+    oppo_deck: Query<'w, 's, &'static OppoDeck>,
     score_bonuses: Res<'w, ScoreBonuses>,
 }
 impl<'w, 's> CardStats<'w, 's> {
     pub fn remaining_score(&self) -> i32 {
         let hands_score: i32 = self.hands.iter().map(Card::max_value).sum();
         let sleeve_score: i32 = self.sleeve.iter().map(Card::max_value).sum();
-        self.player_deck.score() + self.oppo_deck.score() + sleeve_score + hands_score
+        let player_score = self.player_deck.single().score();
+        let oppo_score = self.oppo_deck.single().score();
+        player_score + oppo_score + sleeve_score + hands_score
     }
     pub fn player_score(&self) -> i32 {
         use PileType::Player;
