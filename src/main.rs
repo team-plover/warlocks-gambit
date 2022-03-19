@@ -15,70 +15,13 @@ mod state;
 mod ui;
 mod war;
 
+use state::{GameState, TurnState};
+
 mod camera {
     use bevy::prelude::Component;
 
     #[derive(Component)]
     pub struct PlayerCam;
-}
-// TODO: rename this to reflect content
-mod card_spawner {
-    use super::Participant;
-    use bevy::prelude::Component;
-
-    #[derive(Debug)]
-    pub struct GameOver(pub EndReason);
-    #[derive(Debug)]
-    pub enum EndReason {
-        Victory,
-        Loss,
-        CaughtCheating,
-    }
-
-    #[derive(Default)]
-    pub struct GameStarts(pub u32);
-
-    #[derive(Component)]
-    pub struct PlayerDeck;
-
-    #[derive(Component)]
-    pub struct OppoDeck;
-
-    #[derive(Component)]
-    pub struct GrabbedCard;
-
-    #[derive(Component)]
-    pub struct BirdPupilRoot;
-
-    #[derive(Component)]
-    pub struct BirdPupil;
-
-    /// Card in the War pile played by the player
-    #[derive(Component)]
-    pub struct PlayedCard;
-
-    #[derive(Component)]
-    pub struct CardOrigin(pub Participant);
-
-    /// Component attached to where the opponent draws cards from.
-    #[derive(Component)]
-    pub struct OppoCardSpawner;
-
-    /// Component attached to where the player draws cards from.
-    #[derive(Component)]
-    pub struct PlayerCardSpawner;
-
-    /// Where to stash cards added to sleeve
-    #[derive(Component)]
-    pub struct PlayerSleeve;
-
-    /// Position of the hand of the player
-    #[derive(Component)]
-    pub struct PlayerHand;
-
-    /// Position of the hand of the opposition
-    #[derive(Component)]
-    pub struct OppoHand;
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -87,10 +30,27 @@ pub enum Participant {
     Oppo,
 }
 
+/// Event to trigger a game over.
+#[derive(Debug)]
+pub struct GameOver(pub EndReason);
+
+/// What triggered the game over.
+#[derive(Debug)]
+pub enum EndReason {
+    Victory,
+    Loss,
+    CaughtCheating,
+}
+
+/// How many times did the game get started?
+#[derive(Default)]
+pub struct GameStarts(pub u32);
+
+#[derive(Component)]
+pub struct CardOrigin(pub Participant);
+
 #[derive(Component, Clone)]
 struct WaitScreenRoot;
-
-use state::{GameState, TurnState};
 
 fn main() {
     let mut app = App::new();
@@ -109,7 +69,7 @@ fn main() {
     app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new());
 
     app.insert_resource(ClearColor(Color::rgb(0.293, 0.3828, 0.4023)))
-        .init_resource::<card_spawner::GameStarts>()
+        .init_resource::<GameStarts>()
         .add_plugin(bevy_debug_text_overlay::OverlayPlugin::default())
         .add_plugin(player_hand::Plugin(GameState::Playing))
         .add_plugin(oppo_hand::Plugin(GameState::Playing))
@@ -187,7 +147,7 @@ fn setup_load_screen(
 }
 
 fn first_draw(
-    mut starts: ResMut<card_spawner::GameStarts>,
+    mut starts: ResMut<GameStarts>,
     mut game_msgs: EventWriter<game_ui::EffectEvent>,
     mut state: ResMut<State<TurnState>>,
 ) {

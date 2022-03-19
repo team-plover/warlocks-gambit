@@ -14,12 +14,18 @@ use crate::{
     camera::PlayerCam,
     card::{Card, CardStatus, SpawnCard},
     card_effect::ActivateCard,
-    card_spawner::{GrabbedCard, PlayerHand},
     cheat::{CheatEvent, SleeveCard},
-    deck::PlayerDeck,
+    deck::PlayerDeckRes,
     state::{GameState, TurnState},
     Participant,
 };
+
+/// Position of the hand of the player
+#[derive(Component)]
+pub struct PlayerHand;
+
+#[derive(Component)]
+pub struct GrabbedCard;
 
 enum HandRaycast {}
 
@@ -50,7 +56,7 @@ impl HandCard {
 struct DrawParams<'w, 's> {
     card_spawner: SpawnCard<'w, 's>,
     meshes: ResMut<'w, Assets<Mesh>>,
-    deck: ResMut<'w, PlayerDeck>,
+    deck: ResMut<'w, PlayerDeckRes>,
     audio: EventWriter<'w, 's, AudioRequest>,
 }
 impl<'w, 's> DrawParams<'w, 's> {

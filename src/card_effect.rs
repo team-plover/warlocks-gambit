@@ -9,15 +9,18 @@ use bevy_debug_text_overlay::screen_print;
 use crate::{
     audio::AudioRequest,
     card::{Card, WordOfPower},
-    card_spawner::{CardOrigin, EndReason, GameOver, GameStarts, PlayedCard},
     cheat::SleeveCard,
-    deck::{OppoDeck, PlayerDeck},
+    deck::{OppoDeckRes, PlayerDeckRes},
     game_ui::EffectEvent,
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
     war::{BattleOutcome, Value},
-    Participant,
+    CardOrigin, EndReason, GameOver, GameStarts, Participant,
 };
+
+/// Card in the War pile played by the player
+#[derive(Component)]
+pub struct PlayedCard;
 
 pub struct Initiative(Participant);
 impl Initiative {
@@ -217,8 +220,8 @@ pub struct CardStats<'w, 's> {
     piles: Query<'w, 's, (&'static PileCard, &'static Card)>,
     hands: Query<'w, 's, &'static Card, HandFilter>,
     sleeve: Query<'w, 's, &'static Card, With<SleeveCard>>,
-    player_deck: Res<'w, PlayerDeck>,
-    oppo_deck: Res<'w, OppoDeck>,
+    player_deck: Res<'w, PlayerDeckRes>,
+    oppo_deck: Res<'w, OppoDeckRes>,
     score_bonuses: Res<'w, ScoreBonuses>,
 }
 impl<'w, 's> CardStats<'w, 's> {

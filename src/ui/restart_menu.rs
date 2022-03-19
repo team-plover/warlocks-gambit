@@ -4,11 +4,7 @@ use bevy::prelude::*;
 use bevy_ui_build_macros::{build_ui, size, style, unit};
 use bevy_ui_navigation::{Focusable, NavEvent, NavRequest};
 
-use crate::{
-    card_spawner::{EndReason, GameOver},
-    cleanup_marked,
-    state::GameState,
-};
+use crate::{cleanup_marked, state::GameState, EndReason, GameOver};
 
 struct RestartAssets {
     defeat: Handle<Image>,

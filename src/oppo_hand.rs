@@ -5,14 +5,17 @@ use fastrand::usize as randusize;
 
 use crate::{
     card::{Card, SpawnCard, WordOfPower},
-    card_effect::ActivateCard,
-    card_spawner::{OppoHand, PlayedCard},
-    deck::OppoDeck,
+    card_effect::{ActivateCard, PlayedCard},
+    deck::OppoDeckRes,
     // pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
     war::BattleOutcome,
     Participant,
 };
+
+/// Position of the hand of the opposition
+#[derive(Component)]
+pub struct OppoHand;
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component)]
@@ -25,7 +28,7 @@ impl OppoCard {
     }
 }
 
-fn draw_hand(mut card_spawner: SpawnCard, mut deck: ResMut<OppoDeck>) {
+fn draw_hand(mut card_spawner: SpawnCard, mut deck: ResMut<OppoDeckRes>) {
     for (i, card) in deck.draw(3).into_iter().enumerate() {
         card_spawner
             .spawn_card(card, Participant::Oppo)

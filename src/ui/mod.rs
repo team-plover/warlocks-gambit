@@ -7,12 +7,13 @@ pub use common::UiAssets as Assets;
 use bevy::prelude::{Plugin as BevyPlugin, *};
 
 use crate::GameState;
+
 #[cfg(feature = "debug")]
 fn debug_buttons(
     mut ctx: ResMut<bevy_inspector_egui::bevy_egui::EguiContext>,
-    mut events: EventWriter<crate::card_spawner::GameOver>,
+    mut events: EventWriter<crate::GameOver>,
 ) {
-    use crate::card_spawner::{EndReason, GameOver};
+    use crate::{EndReason, GameOver};
     use bevy_inspector_egui::egui::*;
     Area::new("gameover::debug_buttons")
         .anchor(Align2::RIGHT_BOTTOM, vec2(0., 0.))
