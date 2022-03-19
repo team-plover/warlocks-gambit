@@ -122,7 +122,7 @@ fn update_meshes(
     player_vis.is_visible = player_cards != 0;
     let player = meshes.get_mut(player.clone())?;
     if let Float32x3(positions) = player.attribute_mut(Mesh::ATTRIBUTE_POSITION)? {
-        for pos in positions.iter_mut().filter(|v| v[1] > -0.9) {
+        for pos in positions.iter_mut().filter(|v| v[1] > -0.901) {
             pos[1] = player_cards as f32 / 18.0 - 0.9;
         }
     }
@@ -130,7 +130,7 @@ fn update_meshes(
     oppo_vis.is_visible = oppo_cards != 0;
     let oppo = meshes.get_mut(oppo.clone())?;
     if let Float32x3(positions) = oppo.attribute_mut(Mesh::ATTRIBUTE_POSITION)? {
-        for pos in positions.iter_mut().filter(|v| v[1] > -0.9) {
+        for pos in positions.iter_mut().filter(|v| v[1] > -0.901) {
             pos[1] = oppo_cards as f32 / 18.0 - 0.9;
         }
     }
