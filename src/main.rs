@@ -171,8 +171,6 @@ fn setup_load_screen(
     use bevy_ui_build_macros::{build_ui, size, style, unit};
     if !scene.single().is_loaded() {
         let node = NodeBundle::default();
-        let image = assets.background_image.clone().into();
-        let image = ImageBundle { image, ..Default::default() };
         build_ui! {
             #[cmd(cmds)]
             node {
@@ -181,7 +179,7 @@ fn setup_load_screen(
                 justify_content: JustifyContent::Center,
                 size: size!(100 pct, 100 pct)
             }[; Name::new("Root loading screen node"), WaitScreenRoot] (
-                entity[image; style!{ position_type: PositionType::Absolute, size: size!(100 pct, 100 pct), }],
+                entity[ assets.background(); Name::new("Background") ],
                 entity[assets.large_text("Loading..."); ]
             )
         };

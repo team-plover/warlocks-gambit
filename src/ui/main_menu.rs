@@ -235,15 +235,12 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
             flex_direction: FD::ColumnReverse,
             justify_content: JustifyContent::Center
         }[; Name::new("Main menu root node"), MainMenuRoot](
-            entity[
-                image(&ui_assets.background_image);
-                style! { size: size!(100 pct, 100 pct), position_type: PT::Absolute, }
-            ],
+            entity[ui_assets.background() ;],
             id(cursor),
             entity[
                 image(&menu_assets.title_image);
                 Name::new("Title card"),
-                style! { size: size!(auto, 60 pct), }
+                style! { size: size!(auto, 45 pct), }
             ],
             node{ flex_direction: FD::Row }[; Name::new("Menu columns")](
                 node[; Name::new("Menu node")](
@@ -275,7 +272,7 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
             }[; UiColor(Color::rgb(0.1, 0.1, 0.1)), Name::new("Credits overlay"), CreditOverlay](
                 node[
                     image(&menu_assets.team_name);
-                    Name::new("Title Image"),
+                    Name::new("Team name"),
                     style! { size: size!(auto, 30 pct), }
                 ],
                 node[large_text("music, sfx: Samuel_sound");],
