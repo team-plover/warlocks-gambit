@@ -10,6 +10,7 @@ use bevy::render::{
     },
     render_resource::PrimitiveTopology,
 };
+use bevy_debug_text_overlay::screen_print;
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use enum_map::{enum_map, EnumMap};
@@ -144,7 +145,7 @@ impl<'w, 's> SpawnCard<'w, 's> {
 }
 
 #[allow(clippy::type_complexity)]
-fn update_card(
+fn update_card_graphics(
     cards: Query<(&Card, &CardStatus, &CardGraphics), Or<(Changed<Card>, Changed<CardStatus>)>>,
     assets: Res<CardAssets>,
     mut mat_assets: ResMut<Assets<StandardMaterial>>,
@@ -161,9 +162,13 @@ fn update_card(
             }
         }
         if let (Ok((mut vis, mat)), Some(word)) = (mats.get_mut(graphics.glow), card.word) {
-            let mut mat = mat_assets.get_mut(mat.clone()).unwrap();
-            mat.emissive = word.color();
             vis.is_visible = *status == CardStatus::Hovered;
+            if vis.is_visible {
+                let col = word.color();
+                screen_print!(sec: 1, col: col, "Swapping color of card with {word:?}");
+                let mut mat = mat_assets.get_mut(mat.clone()).unwrap();
+                mat.emissive = col;
+            }
         }
     }
 }
@@ -234,6 +239,7 @@ impl BevyPlugin for Plugin {
             .register_inspectable::<Value>()
             .register_inspectable::<WordOfPower>();
 
-        app.init_resource::<CardAssets>().add_system(update_card);
+        app.init_resource::<CardAssets>()
+            .add_system(update_card_graphics);
     }
 }
