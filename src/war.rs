@@ -9,16 +9,6 @@ pub enum BattleOutcome {
     Tie,
     Win,
 }
-impl BattleOutcome {
-    pub fn invert(self) -> Self {
-        use BattleOutcome::*;
-        match self {
-            Loss => Win,
-            Tie => Tie,
-            Win => Loss,
-        }
-    }
-}
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

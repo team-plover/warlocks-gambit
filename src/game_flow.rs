@@ -139,8 +139,6 @@ impl PlayCard {
 /// It is updated in [`handle_played`] when a card is played. It is read and
 /// reset in [`handle_turn_end`] when each player has played a card.
 struct TurnEffects {
-    /// Winning card is swapped.
-    swap: bool,
     /// Bonus multiplier of card values.
     multiplier: i32,
     /// The value of card of [`Value::Zero`] is 12.
@@ -148,7 +146,7 @@ struct TurnEffects {
 }
 impl Default for TurnEffects {
     fn default() -> Self {
-        Self { swap: false, multiplier: 1, zero_bonus: false }
+        Self { multiplier: 1, zero_bonus: false }
     }
 }
 impl TurnEffects {
@@ -159,7 +157,6 @@ impl TurnEffects {
         match word {
             Qube => self.multiplier *= 2,
             Geh => self.zero_bonus = true,
-            Zihbm => self.swap = !self.swap,
             _ => {}
         }
     }
@@ -298,27 +295,20 @@ fn handle_turn_end(
     };
     match war_pile[..] {
         [card1, card2] => {
-            let (player_card, oppo_card) = if card1.1 .0 == Participant::Player {
-                (card1, card2)
-            } else {
-                (card2, card1)
-            };
-            let mut turn_outcome = player_card.2.value.beats(&oppo_card.2.value);
-            if turn_effects.swap {
-                turn_outcome = turn_outcome.invert();
-            };
-            match turn_outcome {
+            let player_is_1 = card1.1 .0 == Participant::Player;
+            let (player, oppo) = if player_is_1 { (card1, card2) } else { (card2, card1) };
+            match player.2.beats(oppo.2) {
                 BattleOutcome::Tie => {
-                    add_card_to_pile(player_card, Player);
-                    add_card_to_pile(oppo_card, Oppo);
+                    add_card_to_pile(player, Player);
+                    add_card_to_pile(oppo, Oppo);
                 }
                 BattleOutcome::Loss => {
-                    add_card_to_pile(player_card, Oppo);
-                    add_card_to_pile(oppo_card, Oppo);
+                    add_card_to_pile(player, Oppo);
+                    add_card_to_pile(oppo, Oppo);
                 }
                 BattleOutcome::Win => {
-                    add_card_to_pile(player_card, Player);
-                    add_card_to_pile(oppo_card, Player);
+                    add_card_to_pile(player, Player);
+                    add_card_to_pile(oppo, Player);
                 }
             }
             *turn_effects = TurnEffects::default();
