@@ -4,10 +4,9 @@ use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use bevy_scene_hook::SceneHook;
 
 use crate::{
-    card::{Card, WordOfPower},
     scene::Scene,
     state::GameState,
-    war::Value,
+    war::{Card, Value, WordOfPower},
 };
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]

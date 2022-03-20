@@ -7,9 +7,9 @@ use bevy_ui_build_macros::{build_ui, size, style, unit};
 use enum_map::{enum_map, EnumMap};
 
 use crate::{
-    card::WordOfPower,
     game_flow::{CardStats, SeedCount},
     state::GameState,
+    war::WordOfPower,
 };
 
 #[derive(Component, Clone)]

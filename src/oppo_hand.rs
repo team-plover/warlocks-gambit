@@ -4,11 +4,11 @@ use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use fastrand::usize as randusize;
 
 use crate::{
-    card::{Card, SpawnCard, WordOfPower},
+    card::SpawnCard,
     deck::OppoDeck,
     game_flow::{PlayCard, PlayedCard},
     state::{GameState, TurnState},
-    war::{BattleOutcome, Value},
+    war::{BattleOutcome, Card, Value, WordOfPower},
     Participant,
 };
 

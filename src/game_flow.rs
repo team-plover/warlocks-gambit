@@ -94,13 +94,12 @@ use bevy_debug_text_overlay::screen_print;
 
 use crate::{
     audio::AudioRequest,
-    card::{Card, WordOfPower},
     cheat::SleeveCard,
     deck::{OppoDeck, PlayerDeck},
     game_ui::EffectEvent,
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
-    war::{BattleOutcome, Value},
+    war::{BattleOutcome, Card, Value, WordOfPower},
     CardOrigin, EndReason, GameOver, GameStarts, Participant,
 };
 
