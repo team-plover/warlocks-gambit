@@ -128,6 +128,9 @@ fn update_meshes(
             }
         }
         if let Float32x2(uvs) = mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0)? {
+            // the > 0.218 is to only modify uv points for the sides of the deck,
+            // avoiding to modify the uv for the top and bottom face which are
+            // not concerned by the resize.
             for point in uvs.iter_mut().filter(|p| p[0] > 0.218 && p[1] > 0.001) {
                 point[1] = card_count as f32 / 18. + 0.002;
             }

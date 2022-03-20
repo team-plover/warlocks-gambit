@@ -88,7 +88,7 @@
 //! directly updates the [`SeedCount`] resource when an [`PlayCard`] event
 //! is received, it then enters [`TurnState::CardPlayed`].
 
-use bevy::ecs::system::SystemParam;
+use bevy::ecs::{query::QueryItem, system::SystemParam};
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_debug_text_overlay::screen_print;
 
@@ -104,8 +104,9 @@ use crate::{
     CardOrigin, EndReason, GameOver, GameStarts, Participant,
 };
 
-/// Card in the War pile played by the player
+/// Cards in the War pile
 #[derive(Component)]
+#[non_exhaustive]
 pub struct PlayedCard;
 
 /// Who is playing a card currently
@@ -256,37 +257,43 @@ fn handle_played(
     }
 }
 
+type CardsQuery = (
+    &'static PileCard,
+    &'static CardOrigin,
+    &'static Card,
+    Entity,
+);
+
 /// Handle what happens after a card is played
 ///
 /// If there is exactly two cards in the war pile, compute results, move cards
 /// to the winner pile(s) and add any bonus points to [`ScoreBonuses`] if
 /// any card effects were in play this turn. Then enter new turn.
 fn handle_turn_end(
-    cards: Query<(&PileCard, &CardOrigin, &Card, Entity)>,
+    played_cards: Query<CardsQuery, With<PlayedCard>>,
     mut piles: Query<&mut Pile>,
     mut cmds: Commands,
     mut turn_effects: ResMut<TurnEffects>,
     mut score_bonuses: ResMut<ScoreBonuses>,
 ) {
     use Participant::{Oppo, Player};
-    use PileType::War;
-    let war_pile: Vec<_> = cards.iter().filter(|c| c.0.which == War).collect();
-    macro_rules! add_card_to_pile {
-        ($entry:expr, $who:expr) => {
-            let (_, _, card, entity) = $entry;
-            let mut pile = piles.iter_mut().find(|p| p.which == $who.into()).unwrap();
-            cmds.entity(*entity)
-                .insert(pile.additional_card())
-                .remove::<PlayedCard>();
-            let multi = turn_effects.multiplier - 1;
-            // TODO: this is broken with the SWAP modifier I think?
-            let zero_bonus = card.value == Value::Zero && turn_effects.zero_bonus;
-            let zero_bonus = if zero_bonus { 12 } else { 0 };
-            score_bonuses.add_to_owner($who, (card.value as i32) * multi);
-            score_bonuses.add_to_owner($who, zero_bonus * (multi + 1));
-        };
-    }
-    match &war_pile[..] {
+
+    let war_pile: Vec<_> = played_cards.iter().collect();
+
+    // TODO: move this to war.rs and add tests
+    let mut add_card_to_pile = |(_, _, card, entity): QueryItem<CardsQuery>, who: Participant| {
+        let mut pile = piles.iter_mut().find(|p| p.which == who.into()).unwrap();
+        cmds.entity(entity)
+            .insert(pile.additional_card())
+            .remove::<PlayedCard>();
+        let multi = turn_effects.multiplier - 1;
+        // TODO: this is broken with the SWAP modifier I think?
+        let zero_bonus = card.value == Value::Zero && turn_effects.zero_bonus;
+        let zero_bonus = if zero_bonus { 12 } else { 0 };
+        let total_bonus = card.value as i32 * multi + zero_bonus * (multi + 1);
+        score_bonuses.add_to_owner(who, total_bonus);
+    };
+    match war_pile[..] {
         [card1, card2] => {
             let (player_card, oppo_card) = if card1.1 .0 == Participant::Player {
                 (card1, card2)
@@ -299,16 +306,16 @@ fn handle_turn_end(
             };
             match turn_outcome {
                 BattleOutcome::Tie => {
-                    add_card_to_pile!(player_card, Player);
-                    add_card_to_pile!(oppo_card, Oppo);
+                    add_card_to_pile(player_card, Player);
+                    add_card_to_pile(oppo_card, Oppo);
                 }
                 BattleOutcome::Loss => {
-                    add_card_to_pile!(player_card, Oppo);
-                    add_card_to_pile!(oppo_card, Oppo);
+                    add_card_to_pile(player_card, Oppo);
+                    add_card_to_pile(oppo_card, Oppo);
                 }
                 BattleOutcome::Win => {
-                    add_card_to_pile!(player_card, Player);
-                    add_card_to_pile!(oppo_card, Player);
+                    add_card_to_pile(player_card, Player);
+                    add_card_to_pile(oppo_card, Player);
                 }
             }
             *turn_effects = TurnEffects::default();
