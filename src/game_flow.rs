@@ -241,7 +241,7 @@ fn handle_turn_end(
             let player_is_1 = card1.0 .0 == Participant::Player;
             let (player, oppo) = if player_is_1 { (card1, card2) } else { (card2, card1) };
             let (player_bonus, oppo_bonus) = player.1.bonus_points(oppo.1);
-            screen_print!(sec: 2, col: Color::FUCHSIA, "player: {player_bonus}, oppo: {oppo_bonus}");
+            screen_print!(sec: 2, "player: {player_bonus}, oppo: {oppo_bonus}");
             match player.1.beats(oppo.1) {
                 BattleOutcome::Tie => {
                     add_card_to_pile(player.2, player_bonus, Player);
@@ -319,7 +319,7 @@ fn handle_new_turn(
     hands: Query<(), HandFilter>,
     card_stats: CardStats,
 ) {
-    screen_print!(sec: 1.0, "handle turn n*{}", turn_count.0);
+    screen_print!(sec: 1.0, col: Color::BLUE, "handle turn n*{}", turn_count.0);
     let player_score = card_stats.player_score();
     let oppo_score = card_stats.oppo_score();
     let remaining_scores = card_stats.remaining_score();
@@ -331,7 +331,9 @@ fn handle_new_turn(
         return;
     }
     turn_count.0 += 1;
-    initative.swap();
+    if turn_count.0 % 2 == 1 {
+        initative.swap();
+    }
     // TODO: use size_hint once bevy#4244 is merged (https://github.com/bevyengine/bevy/pull/4244)
     match initative.0 {
         _ if hands.iter().count() == 0 => turn.set(TurnState::Draw).unwrap(),
