@@ -1,13 +1,11 @@
+use std::str::FromStr;
+
 use bevy::prelude::{Plugin as BevyPlugin, *};
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use bevy_scene_hook::SceneHook;
 
-use crate::{
-    scene::Scene,
-    state::GameState,
-    war::{Card, Value, WordOfPower},
-};
+use crate::{scene::Scene, state::GameState, war::Card};
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 struct Deck {
@@ -28,6 +26,16 @@ impl Deck {
     }
     fn score(&self) -> i32 {
         self.cards.iter().map(Card::max_value).sum()
+    }
+}
+impl FromStr for Deck {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let deck = s
+            .split_ascii_whitespace()
+            .map(|s| s.parse())
+            .collect::<Result<_, _>>()?;
+        Ok(Self::new(deck))
     }
 }
 
@@ -60,52 +68,27 @@ impl_deck_methods!(PlayerDeck);
 pub struct OppoDeck(Deck);
 impl_deck_methods!(OppoDeck);
 
-macro_rules! cards {
-    ($($value:tt $word:tt |)*) => (
-        Deck::new(vec![ $( Card::new(cards!(@word $word), cards!(@val $value)) ,)* ])
-    );
-    (@val 0) => (Value::Zero);
-    (@val 1) => (Value::One);
-    (@val 2) => (Value::Two);
-    (@val 3) => (Value::Three);
-    (@val 4) => (Value::Four);
-    (@val 5) => (Value::Five);
-    (@val 6) => (Value::Six);
-    (@val 7) => (Value::Seven);
-    (@val 8) => (Value::Eight);
-    (@val 9) => (Value::Nine);
-    (@word _) => (None);
-    (@word s) => (Some(WordOfPower::Egeq)); // Seed
-    (@word d) => (Some(WordOfPower::Qube)); // Double
-    (@word w) => (Some(WordOfPower::Zihbm)); // Swap
-    (@word z) => (Some(WordOfPower::Geh)); // 0 -> 12
-}
-
 impl PlayerDeck {
-    #[rustfmt::skip]
     pub fn new() -> Self {
-        Self(cards![
-            7 s | 0 _ | 1 s |
-            4 _ | 2 _ | 6 d |
-            6 s | 8 w | 0 z |
-            2 s | 3 _ | 4 _ |
-            3 _ | 9 z | 1 d |
-            5 w | 4 _ | 3 _ |
-        ])
+        let deck = "7s  0_  1s
+                    4_  2_  6d
+                    6s  8w  0z
+                    2s  3_  4_
+                    3_  9z  1d
+                    5w  4_  3_";
+        Self(deck.parse().unwrap())
     }
 }
 
 impl OppoDeck {
-    #[rustfmt::skip]
     pub fn new() -> Self {
-        Self(cards![
-            8 _ | 7 _ | 6 _ |
-            9 z | 5 d | 6 _ |
-            8 _ | 9 _ | 6 _ |
-            7 _ | 1 w | 5 _ |
-            9 d | 0 w | 5 _ |
-            1 d | 6 d | 5 _ |
-        ])
+        let deck = "8_  7_  6_ 
+                    9z  5d  6_ 
+                    8_  9_  6_ 
+                    7_  1w  5_ 
+                    9d  0w  5_ 
+                    1d  6d  5_";
+        Self(deck.parse().unwrap())
     }
 }
 
