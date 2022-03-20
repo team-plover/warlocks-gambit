@@ -21,7 +21,7 @@ impl BattleOutcome {
 }
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
-#[derive(Enum, Debug, Clone, Copy, PartialEq)]
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value {
     Zero = 0,
     One = 1,

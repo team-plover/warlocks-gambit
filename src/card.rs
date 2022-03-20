@@ -14,7 +14,10 @@ use bevy::render::{
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use enum_map::{enum_map, Enum, EnumMap};
 
-use crate::{war::Value, CardOrigin, Participant};
+use crate::{
+    war::{BattleOutcome, Value},
+    CardOrigin, Participant,
+};
 
 /// Component attached to where the opponent draws cards from.
 #[derive(Component)]
@@ -66,11 +69,27 @@ pub enum CardStatus {
 }
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
-#[derive(Component, Debug)]
+#[derive(Component, Clone, Debug)]
 pub struct Card {
     pub word: Option<WordOfPower>,
     pub value: Value,
     status: CardStatus,
+}
+impl PartialEq for Card {
+    fn eq(&self, other: &Self) -> bool {
+        self.word == other.word && self.value == other.value
+    }
+}
+impl Eq for Card {}
+impl PartialOrd for Card {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.value.partial_cmp(&other.value)
+    }
+}
+impl Ord for Card {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.value.cmp(&other.value)
+    }
 }
 #[cfg(feature = "debug")]
 impl Default for Card {
@@ -83,6 +102,17 @@ impl Default for Card {
     }
 }
 impl Card {
+    pub fn beats(&self, other: &Self) -> BattleOutcome {
+        use BattleOutcome::{Loss, Tie, Win};
+        use WordOfPower::Zihbm;
+        let swaps = |card: &Card| card.word == Some(Zihbm);
+        let swap = swaps(self) ^ swaps(other);
+        match (self.value.beats(&other.value), swap) {
+            (Loss, false) | (Win, true) => Loss,
+            (Loss, true) | (Win, false) => Win,
+            (Tie, _) => Tie,
+        }
+    }
     pub fn new(word: Option<WordOfPower>, value: Value) -> Self {
         let status = CardStatus::Normal;
         Self { word, value, status }
