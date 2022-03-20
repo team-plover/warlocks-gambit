@@ -2,7 +2,7 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_kira_audio::{Audio, AudioChannel as KiraChannel, AudioPlugin, AudioSource};
 use enum_map::{enum_map, EnumMap};
 
-use crate::card::WordOfPower;
+use crate::war::WordOfPower;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum AudioChannel {

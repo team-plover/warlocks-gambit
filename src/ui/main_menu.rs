@@ -54,9 +54,10 @@ fn update_sliders(
     mut mouse_motion: EventReader<MouseMotion>,
     mut cmds: Commands,
     mut audio_requests: EventWriter<AudioRequest>,
+    mut nav_requests: EventWriter<NavRequest>,
     focused: Query<Entity, With<Focused>>,
     elems: Query<&MainMenuElem, Without<MovingSlider>>,
-    mouse_buttons: Res<Input<MouseButton>>,
+    mut mouse_buttons: ResMut<Input<MouseButton>>,
 ) {
     use MainMenuElem::AudioSlider;
     if let Ok((entity, mut style, mut elem)) = styles.get_single_mut() {
@@ -70,6 +71,8 @@ fn update_sliders(
             style.position.left = Val::Percent(new_left * 0.9)
         };
         if mouse_buttons.just_released(MouseButton::Left) {
+            mouse_buttons.clear_just_released(MouseButton::Left);
+            nav_requests.send(NavRequest::Free);
             audio_requests.send(AudioRequest::StopSfxLoop);
             cmds.entity(entity).remove::<MovingSlider>();
         }
@@ -77,6 +80,7 @@ fn update_sliders(
     if let Ok(entity) = focused.get_single() {
         let is_volume_slider = matches!(elems.get(entity), Ok(AudioSlider(..)));
         if mouse_buttons.just_pressed(MouseButton::Left) && is_volume_slider {
+            nav_requests.send(NavRequest::Action);
             audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::StartLoop));
             cmds.entity(entity).insert(MovingSlider);
         }
@@ -104,7 +108,7 @@ fn update_menu(
                 }
             }
             NavEvent::Locked(from) => {
-                if let Ok(MainMenuElem::Credits) = elems.get(*from).map(|t| t.2) {
+                if matches!(elems.get(*from), Ok((_, _, MainMenuElem::Credits))) {
                     let mut style = credit_overlay.single_mut();
                     style.display = Display::Flex;
                 }
@@ -143,9 +147,7 @@ fn update_menu(
                     _ => {}
                 }
             }
-            _ => {
-                println!("unhandled nav event: {nav_event:?}");
-            }
+            _ => {}
         }
     }
 }
@@ -209,7 +211,7 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
                     ],
                     entity[
                         image(&menu_assets.slider_handle);
-                        focusable,
+                        Focusable::lock(),
                         MainMenuElem::AudioSlider(channel, strength),
                         handle_name,
                         style! {

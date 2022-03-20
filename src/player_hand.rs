@@ -1,7 +1,7 @@
 use std::f32::consts::FRAC_PI_4;
 
 use bevy::{
-    ecs::system::SystemParam,
+    ecs::{query::QueryItem, system::SystemParam},
     prelude::{Plugin as BevyPlugin, *},
 };
 #[cfg(feature = "debug")]
@@ -12,9 +12,9 @@ use crate::{
     animate::{Animated, DisableAnimation},
     audio::AudioRequest::{self, PlayShuffleLong, PlayShuffleShort},
     camera::PlayerCam,
-    card::{Card, CardStatus, SpawnCard},
+    card::{CardStatus, SpawnCard},
     cheat::{CheatEvent, SleeveCard},
-    deck::PlayerDeckRes,
+    deck::PlayerDeck,
     game_flow::PlayCard,
     state::{GameState, TurnState},
     Participant,
@@ -30,23 +30,14 @@ pub struct GrabbedCard;
 enum HandRaycast {}
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
-#[derive(PartialEq)]
-enum HoverStatus {
-    Hovered,
-    Dragging,
-    None,
-}
-
-#[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component)]
 struct HandCard {
     index: usize,
-    hover: HoverStatus,
+    dragging: bool,
 }
 impl HandCard {
     fn new(index: usize) -> Self {
-        let hover = HoverStatus::None;
-        Self { index, hover }
+        Self { index, dragging: false }
     }
 }
 
@@ -56,13 +47,16 @@ impl HandCard {
 struct DrawParams<'w, 's> {
     card_spawner: SpawnCard<'w, 's>,
     meshes: ResMut<'w, Assets<Mesh>>,
-    deck: ResMut<'w, PlayerDeckRes>,
+    deck: Query<'w, 's, &'static mut PlayerDeck>,
     audio: EventWriter<'w, 's, AudioRequest>,
 }
 impl<'w, 's> DrawParams<'w, 's> {
+    fn deck(&mut self) -> Mut<PlayerDeck> {
+        self.deck.single_mut()
+    }
     fn draw(&mut self, count: usize) {
         self.audio.send(PlayShuffleLong);
-        for (i, card) in self.deck.draw(count).into_iter().enumerate() {
+        for (i, card) in self.deck().draw(count).into_iter().enumerate() {
             self.card_spawner
                 .spawn_card(card, Participant::Player)
                 .insert_bundle((
@@ -109,30 +103,28 @@ fn update_raycast(
     }
 }
 
-/// Set the [`HoverStatus`] of cards
-fn select_card(
-    mut cursor: EventReader<CursorMoved>,
+/// Set the [`CardStatus`] of cards, un-hovering cards not under cursor and
+/// hovering ones that just came under it.
+fn hover_card(
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
-    mut hand_cards: Query<(Entity, &mut Card, &mut HandCard)>,
+    mouse: Res<Input<MouseButton>>,
+    mut hand_cards: Query<(Entity, &mut CardStatus)>,
     mut audio: EventWriter<AudioRequest>,
 ) {
-    use HoverStatus::{Dragging, Hovered};
+    if mouse.pressed(MouseButton::Left) {
+        return;
+    }
     let query = hand_raycaster.get_single().map(|ray| ray.intersect_top());
-    let has_cursor_moved = cursor.iter().next().is_some();
-    if let Ok(Some((hovered_card, _))) = query {
-        if !has_cursor_moved {
-            return;
-        }
-        for (entity, mut card, mut hand_card) in hand_cards.iter_mut() {
-            if entity == hovered_card && hand_card.hover != Dragging {
-                card.set_status(CardStatus::Hovered);
-                if hand_card.hover != Hovered {
-                    audio.send(PlayShuffleShort);
-                }
-                hand_card.hover = Hovered;
-            } else if hand_card.hover != Dragging {
-                card.set_status(CardStatus::Normal);
-                hand_card.hover = HoverStatus::None;
+    if let Ok(Some((card_under_cursor, _))) = query {
+        for (entity, mut hover) in hand_cards.iter_mut() {
+            let is_under_cursor = entity == card_under_cursor;
+            let is_hovering = *hover == CardStatus::Hovered;
+            if is_under_cursor && !is_hovering {
+                *hover = CardStatus::Hovered;
+                audio.send(PlayShuffleShort);
+            }
+            if !is_under_cursor && is_hovering {
+                *hover = CardStatus::Normal;
             }
         }
     }
@@ -148,50 +140,51 @@ fn play_card(
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
     mut card_events: EventWriter<PlayCard>,
     mut cmds: Commands,
-    mut hand_cards: Query<(Entity, &mut Card, &mut HandCard, &mut Transform)>,
+    mut hand_cards: Query<(Entity, &mut CardStatus, &mut HandCard, &mut Transform)>,
     mut hand_events: EventWriter<HandEvent>,
     mut cheat_events: EventWriter<CheatEvent>,
     mut card_drawer: DrawParams,
     sleeve_cards: Query<(), With<SleeveCard>>,
 ) {
-    use HoverStatus::{Dragging, Hovered};
+    use CardStatus::Hovered;
     let query = hand_raycaster.get_single().map(|ray| ray.intersect_top());
-    for (entity, mut card, mut hand_card, mut trans) in hand_cards.iter_mut() {
-        match hand_card.hover {
-            Hovered if mouse.just_pressed(MouseButton::Left) => {
-                let hovered_card = if let Ok(Some((e, _))) = query { e } else { break };
-                if hovered_card == entity {
+    for (entity, mut hover_state, mut card, mut trans) in hand_cards.iter_mut() {
+        match (*hover_state, card.dragging) {
+            (Hovered, false) if mouse.just_pressed(MouseButton::Left) => {
+                let under_cursor = if let Ok(Some((e, _))) = query { e } else { break };
+                if entity == under_cursor {
                     cmds.entity(entity).insert(GrabbedCard);
-                    hand_card.hover = Dragging;
+                    card.dragging = true;
                     break;
                 }
             }
-            Dragging if mouse.just_released(MouseButton::Left) => {
-                let intersection = if let Ok(Some((_, i))) = query { i } else { break };
-                let cursor_pos = intersection.position();
-                let cards_remaining = card_drawer.deck.remaining() != 0;
+            (_, false) => {}
+            (_, true) if mouse.just_released(MouseButton::Left) => {
+                let word_cursor = if let Ok(Some((_, i))) = query { i } else { break };
+                let cursor_pos = word_cursor.position();
+                let cards_remaining = card_drawer.deck().remaining() != 0;
                 let can_sleeve = sleeve_cards.iter().count() < 3 && cards_remaining;
                 cmds.entity(entity).remove::<GrabbedCard>();
+                *hover_state = CardStatus::Normal;
                 if cursor_pos.x < -1.0 && cursor_pos.y < 4.7 && can_sleeve {
-                    card.set_status(CardStatus::Normal);
                     cmds.entity(entity).remove::<HandCard>();
                     cheat_events.send(CheatEvent::HideInSleeve(entity));
                     hand_events.send(HandEvent::LowerSleeve);
                     card_drawer.draw(1);
                 } else if cursor_pos.x > 0.2 || cursor_pos.y > 6.0 {
-                    card.set_status(CardStatus::Normal);
                     cmds.entity(entity).remove::<HandCard>();
                     cmds.entity(entity).remove::<RayCastMesh<HandRaycast>>();
                     card_events.send(PlayCard::new(entity, Participant::Player));
                 } else {
-                    hand_card.hover = HoverStatus::None;
+                    card.dragging = false;
                 }
                 break;
             }
-            Dragging => {
-                let intersection = if let Ok(Some((_, i))) = query { i } else { break };
-                let cursor_pos = intersection.position();
-                let cards_remaining = card_drawer.deck.remaining() != 0;
+            (_, true) => {
+                let word_cursor = if let Ok(Some((_, i))) = query { i } else { break };
+                let cursor_pos = word_cursor.position();
+                let cards_remaining = card_drawer.deck().remaining() != 0;
+                // FIXME: use size_hint().0 when bevy#4244 pr is merged
                 let can_sleeve = sleeve_cards.iter().count() < 3 && cards_remaining;
                 trans.translation = cursor_pos;
                 if cursor_pos.x < -1.0 && cursor_pos.y < 4.7 && can_sleeve {
@@ -201,7 +194,6 @@ fn play_card(
                 }
                 break;
             }
-            _ => {}
         }
     }
 }
@@ -217,11 +209,10 @@ fn update_sleeve(
     mut raised: Local<bool>,
     time: Res<Time>,
 ) {
-    use HoverStatus::Dragging;
     let (hand, mut trans) = hand.single_mut();
     let sleeve_move = Vec3::Y * 1.5;
     if *raised {
-        if let Some((mut trans, _)) = cards.iter_mut().find(|c| c.1.hover == Dragging) {
+        if let Some((mut trans, _)) = cards.iter_mut().find(|c| c.1.dragging) {
             let delta = time.delta_seconds();
             trans.rotation = trans.rotation.lerp(Quat::IDENTITY, delta * 10.0);
         }
@@ -243,25 +234,30 @@ fn update_sleeve(
     }
 }
 
+type HoverQuery = (
+    &'static mut Transform,
+    &'static CardStatus,
+    &'static HandCard,
+);
 /// Animate card movements into the player hand
 ///
 /// (skip card if we are currently dragging it)
 fn update_hand(
     hand: Query<&GlobalTransform, With<PlayerHand>>,
-    mut cards: Query<(&mut Transform, &HandCard)>,
+    mut cards: Query<HoverQuery>,
     time: Res<Time>,
 ) {
-    use HoverStatus::Hovered;
     let card_speed = 10.0 * time.delta_seconds();
     let hand_transform = hand.single();
     let hand_pos = hand_transform.translation;
-    let not_dragging = |(_, card): &(_, &HandCard)| card.hover != HoverStatus::Dragging;
-    for (mut transform, HandCard { index, hover }) in cards.iter_mut().filter(not_dragging) {
+    let not_dragging = |c: &QueryItem<HoverQuery>| !c.2.dragging;
+    for (mut transform, hover, HandCard { index, .. }) in cards.iter_mut().filter(not_dragging) {
+        let is_hovering = *hover == CardStatus::Hovered;
         let i_f32 = 0.7 * *index as f32;
-        let hover_mul = if *hover == Hovered { 2.0 } else { 1.0 };
+        let hover_mul = if is_hovering { 2.0 } else { 1.0 };
         let y_offset = i_f32.cos() * hover_mul;
         let x_offset = i_f32.sin() * hover_mul;
-        let z_offset = if *hover == Hovered { 0.01 } else { i_f32 * -0.01 };
+        let z_offset = if is_hovering { 0.01 } else { i_f32 * -0.01 };
         let target = hand_pos + Vec3::new(x_offset - 0.3, y_offset, z_offset + 0.05);
         let origin = transform.translation;
         transform.translation += (target - origin) * card_speed;
@@ -294,7 +290,7 @@ impl BevyPlugin for Plugin {
             .add_system_set(SystemSet::on_enter(TurnState::Draw).with_system(draw_hand))
             .add_system_set(
                 SystemSet::on_update(TurnState::Player)
-                    .with_system(select_card.label("select"))
+                    .with_system(hover_card.label("select"))
                     .with_system(play_card.label("play").after("select"))
                     .with_system(update_raycast),
             )

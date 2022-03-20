@@ -1,5 +1,5 @@
 //! Game flow driver, manages how cards are played, when it is possible to
-//! play them and who can play them. Also manages score and card effects.
+//! play them and who can play them. Also manages score and seeds.
 //!
 //! # Architecture
 //!
@@ -19,7 +19,7 @@
 //!
 //! * [`handle_new_turn`]: end game if one of the players cannot win
 //! * [`complete_draw`]: Set who's turn it is to play after drawing cards
-//! * [`handle_played`]: Handle effects based on played card and enter
+//! * [`handle_played`]: Handle played card adding seed if relevant and enter
 //!   `CardPlayed` state.
 //! * [`wait_active`]: Wait a little time after a card is played
 //! * [`handle_turn_end`]: Start new turn after swapping initiative,
@@ -76,7 +76,7 @@
 //! Player and opposition scores are tracked in this module. The
 //! [`handle_turn_end`] system computes the points at the end of each "Battle"
 //! according to specification in [crate::war] module and hands out point
-//! bonuses based on played card [`WordOfPower`]s. Currently only four words
+//! bonuses based on played card [`crate::war::WordOfPower`]s. Currently only four words
 //! are handled. See [`handle_turn_end`] docs for specifics.
 //!
 //! The module provides the [`CardStats`] system parameter for other modules
@@ -84,9 +84,8 @@
 //!
 //! ## Effects
 //!
-//! The [`handle_played`] system adds card effects to the [`TurnEffects`] or
-//! directly updates the [`SeedCount`] resource when an [`PlayCard`] event
-//! is received, it then enters [`TurnState::CardPlayed`].
+//! The [`handle_played`] system directly updates the [`SeedCount`] resource when a
+//! [`PlayCard`] event is received, it then enters [`TurnState::CardPlayed`].
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::{Plugin as BevyPlugin, *};
@@ -94,18 +93,18 @@ use bevy_debug_text_overlay::screen_print;
 
 use crate::{
     audio::AudioRequest,
-    card::{Card, WordOfPower},
     cheat::SleeveCard,
-    deck::{OppoDeckRes, PlayerDeckRes},
+    deck::{OppoDeck, PlayerDeck},
     game_ui::EffectEvent,
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
-    war::{BattleOutcome, Value},
+    war::{BattleOutcome, Card, WordOfPower::Egeq},
     CardOrigin, EndReason, GameOver, GameStarts, Participant,
 };
 
-/// Card in the War pile played by the player
+/// Cards in the War pile
 #[derive(Component)]
+#[non_exhaustive]
 pub struct PlayedCard;
 
 /// Who is playing a card currently
@@ -130,37 +129,6 @@ pub struct PlayCard {
 impl PlayCard {
     pub fn new(card: Entity, who: Participant) -> Self {
         Self { card, who }
-    }
-}
-
-/// Active effects.
-///
-/// It is updated in [`handle_played`] when a card is played. It is read and
-/// reset in [`handle_turn_end`] when each player has played a card.
-struct TurnEffects {
-    /// Winning card is swapped.
-    swap: bool,
-    /// Bonus multiplier of card values.
-    multiplier: i32,
-    /// The value of card of [`Value::Zero`] is 12.
-    zero_bonus: bool,
-}
-impl Default for TurnEffects {
-    fn default() -> Self {
-        Self { swap: false, multiplier: 1, zero_bonus: false }
-    }
-}
-impl TurnEffects {
-    /// Add the effect corresponding to the given [`WordOfPower`] to effects
-    /// this turn.
-    fn add(&mut self, word: WordOfPower) {
-        use WordOfPower::*;
-        match word {
-            Qube => self.multiplier *= 2,
-            Geh => self.zero_bonus = true,
-            Zihbm => self.swap = !self.swap,
-            _ => {}
-        }
     }
 }
 
@@ -203,22 +171,15 @@ pub struct TurnCount(pub usize);
 
 /// Handle [`PlayCard`] events.
 ///
-/// Adds card effects from the [`PlayCard::card`] to the [`TurnEffects`] or
-/// directly updates the [`SeedCount`] resource when an [`PlayCard`] event
+/// Directly updates the [`SeedCount`] resource when an [`PlayCard`] event
 /// is received, move the card to the war [`Pile`], and then enter the active
 /// [`TurnState`] corresponding to [`PlayCard::who`] played the card.
-///
-/// ## Card effects
-///
-/// * `Egeq`: Give an extra seed to the player.
-/// * `Qube`, `Zihbm` and `Geh`: See [`TurnEffects::add`].
 fn handle_played(
     mut events: EventReader<PlayCard>,
     mut ui_events: EventWriter<EffectEvent>,
     mut cmds: Commands,
     mut pile: Query<&mut Pile>,
     mut turn: ResMut<State<TurnState>>,
-    mut turn_effects: ResMut<TurnEffects>,
     mut seed_count: ResMut<SeedCount>,
     mut audio_events: EventWriter<AudioRequest>,
     mut tuto_shown: Local<bool>,
@@ -226,12 +187,11 @@ fn handle_played(
     cards: Query<&Card>,
 ) {
     use PileType::War;
-    use WordOfPower::*;
     for PlayCard { card, .. } in events.iter() {
         let msg = "War pile exists";
         let mut pile = pile.iter_mut().find(|p| p.which == War).expect(msg);
         cmds.entity(*card)
-            .insert_bundle((pile.additional_card(), PlayedCard));
+            .insert_bundle((pile.add_existing(*card), PlayedCard));
         let card_word = cards.get(*card).map(|c| c.word);
         audio_events.send(AudioRequest::PlayShuffleLong);
         if let Ok(Some(word)) = card_word {
@@ -239,18 +199,12 @@ fn handle_played(
             ui_events.send(EffectEvent::Show(word));
             audio_events.send(AudioRequest::PlayWord(word));
         }
-        match card_word {
-            Ok(Some(Egeq)) => {
-                if game_starts.0 == 2 && !*tuto_shown {
-                    *tuto_shown = true;
-                    ui_events.send(EffectEvent::TutoUseSeed);
-                }
-                seed_count.0 += 1;
+        if let Ok(Some(Egeq)) = card_word {
+            if game_starts.0 == 2 && !*tuto_shown {
+                *tuto_shown = true;
+                ui_events.send(EffectEvent::TutoUseSeed);
             }
-            Ok(Some(Qube)) => turn_effects.add(Qube),
-            Ok(Some(Zihbm)) => turn_effects.add(Zihbm),
-            Ok(Some(Geh)) => turn_effects.add(Geh),
-            _ => {}
+            seed_count.0 += 1;
         }
         turn.set(TurnState::CardPlayed).unwrap();
     }
@@ -262,56 +216,46 @@ fn handle_played(
 /// to the winner pile(s) and add any bonus points to [`ScoreBonuses`] if
 /// any card effects were in play this turn. Then enter new turn.
 fn handle_turn_end(
-    cards: Query<(&PileCard, &CardOrigin, &Card, Entity)>,
+    played_cards: Query<(&CardOrigin, &Card, Entity), With<PlayedCard>>,
     mut piles: Query<&mut Pile>,
     mut cmds: Commands,
-    mut turn_effects: ResMut<TurnEffects>,
     mut score_bonuses: ResMut<ScoreBonuses>,
 ) {
     use Participant::{Oppo, Player};
-    use PileType::War;
-    let war_pile: Vec<_> = cards.iter().filter(|c| c.0.which == War).collect();
-    macro_rules! add_card_to_pile {
-        ($entry:expr, $who:expr) => {
-            let (_, _, card, entity) = $entry;
-            let mut pile = piles.iter_mut().find(|p| p.which == $who.into()).unwrap();
-            cmds.entity(*entity)
-                .insert(pile.additional_card())
-                .remove::<PlayedCard>();
-            let multi = turn_effects.multiplier - 1;
-            // TODO: this is broken with the SWAP modifier I think?
-            let zero_bonus = card.value == Value::Zero && turn_effects.zero_bonus;
-            let zero_bonus = if zero_bonus { 12 } else { 0 };
-            score_bonuses.add_to_owner($who, (card.value as i32) * multi);
-            score_bonuses.add_to_owner($who, zero_bonus * (multi + 1));
-        };
-    }
-    match &war_pile[..] {
+
+    let war_pile: Vec<_> = played_cards.iter().collect();
+
+    let mut add_card_to_pile = |entity, bonus, who: Participant| {
+        let is_war = |p: &Mut<Pile>| p.which == PileType::War;
+        let is_who = |p: &Mut<Pile>| p.which == who.into();
+
+        let mut pile = piles.iter_mut().find(is_who).unwrap();
+        cmds.entity(entity)
+            .insert(pile.add_existing(entity))
+            .remove::<PlayedCard>();
+        piles.iter_mut().find(is_war).unwrap().remove(entity);
+        score_bonuses.add_to_owner(who, bonus);
+    };
+    match war_pile[..] {
         [card1, card2] => {
-            let (player_card, oppo_card) = if card1.1 .0 == Participant::Player {
-                (card1, card2)
-            } else {
-                (card2, card1)
-            };
-            let mut turn_outcome = player_card.2.value.beats(&oppo_card.2.value);
-            if turn_effects.swap {
-                turn_outcome = turn_outcome.invert();
-            };
-            match turn_outcome {
+            let player_is_1 = card1.0 .0 == Participant::Player;
+            let (player, oppo) = if player_is_1 { (card1, card2) } else { (card2, card1) };
+            let (player_bonus, oppo_bonus) = player.1.bonus_points(oppo.1);
+            screen_print!(sec: 2, "player: {player_bonus}, oppo: {oppo_bonus}");
+            match player.1.beats(oppo.1) {
                 BattleOutcome::Tie => {
-                    add_card_to_pile!(player_card, Player);
-                    add_card_to_pile!(oppo_card, Oppo);
+                    add_card_to_pile(player.2, player_bonus, Player);
+                    add_card_to_pile(oppo.2, oppo_bonus, Oppo);
                 }
                 BattleOutcome::Loss => {
-                    add_card_to_pile!(player_card, Oppo);
-                    add_card_to_pile!(oppo_card, Oppo);
+                    add_card_to_pile(player.2, player_bonus, Oppo);
+                    add_card_to_pile(oppo.2, oppo_bonus, Oppo);
                 }
                 BattleOutcome::Win => {
-                    add_card_to_pile!(player_card, Player);
-                    add_card_to_pile!(oppo_card, Player);
+                    add_card_to_pile(player.2, player_bonus, Player);
+                    add_card_to_pile(oppo.2, oppo_bonus, Player);
                 }
             }
-            *turn_effects = TurnEffects::default();
         }
         [] | [_] => {}
         _ => {
@@ -325,8 +269,8 @@ type HandFilter = (With<CardOrigin>, Without<PileCard>, Without<SleeveCard>);
 
 /// Query scores.
 ///
-/// A [`Participant`]'s score is exactly the [`Value`] of cards in their
-/// [`Pile`] plus any bonus points earned with [`WordOfPower`]s. Since it is
+/// A [`Participant`]'s score is exactly the [`crate::war::Value`] of cards in their
+/// [`Pile`] plus any bonus points earned with [`crate::war::WordOfPower`]s. Since it is
 /// not trivial to compute it, this `SystemParam` let you query the scores
 /// through its methods.
 #[derive(SystemParam)]
@@ -334,15 +278,17 @@ pub struct CardStats<'w, 's> {
     piles: Query<'w, 's, (&'static PileCard, &'static Card)>,
     hands: Query<'w, 's, &'static Card, HandFilter>,
     sleeve: Query<'w, 's, &'static Card, With<SleeveCard>>,
-    player_deck: Res<'w, PlayerDeckRes>,
-    oppo_deck: Res<'w, OppoDeckRes>,
+    player_deck: Query<'w, 's, &'static PlayerDeck>,
+    oppo_deck: Query<'w, 's, &'static OppoDeck>,
     score_bonuses: Res<'w, ScoreBonuses>,
 }
 impl<'w, 's> CardStats<'w, 's> {
     pub fn remaining_score(&self) -> i32 {
         let hands_score: i32 = self.hands.iter().map(Card::max_value).sum();
         let sleeve_score: i32 = self.sleeve.iter().map(Card::max_value).sum();
-        self.player_deck.score() + self.oppo_deck.score() + sleeve_score + hands_score
+        let player_score = self.player_deck.single().score();
+        let oppo_score = self.oppo_deck.single().score();
+        player_score + oppo_score + sleeve_score + hands_score
     }
     pub fn player_score(&self) -> i32 {
         use PileType::Player;
@@ -373,7 +319,7 @@ fn handle_new_turn(
     hands: Query<(), HandFilter>,
     card_stats: CardStats,
 ) {
-    screen_print!(sec: 1.0, "handle turn n*{}", turn_count.0);
+    screen_print!(sec: 1.0, col: Color::BLUE, "handle turn n*{}", turn_count.0);
     let player_score = card_stats.player_score();
     let oppo_score = card_stats.oppo_score();
     let remaining_scores = card_stats.remaining_score();
@@ -385,7 +331,9 @@ fn handle_new_turn(
         return;
     }
     turn_count.0 += 1;
-    initative.swap();
+    if turn_count.0 % 2 == 1 {
+        initative.swap();
+    }
     // TODO: use size_hint once bevy#4244 is merged (https://github.com/bevyengine/bevy/pull/4244)
     match initative.0 {
         _ if hands.iter().count() == 0 => turn.set(TurnState::Draw).unwrap(),
@@ -434,13 +382,11 @@ fn cleanup(
     mut turn_count: ResMut<TurnCount>,
     mut initative: ResMut<Initiative>,
     mut score_bonuses: ResMut<ScoreBonuses>,
-    mut turn_effects: ResMut<TurnEffects>,
     mut seed_count: ResMut<SeedCount>,
 ) {
     turn_count.0 = 0;
     initative.0 = Participant::Player;
     *score_bonuses = ScoreBonuses::default();
-    *turn_effects = TurnEffects::default();
     *seed_count = SeedCount::default();
     for entity in all_cards.iter() {
         cmds.entity(entity).despawn_recursive();
@@ -454,7 +400,6 @@ impl BevyPlugin for Plugin {
         app.add_event::<PlayCard>()
             .init_resource::<TurnCount>()
             .init_resource::<ScoreBonuses>()
-            .init_resource::<TurnEffects>()
             .init_resource::<SeedCount>()
             .insert_resource(Initiative(Participant::Player))
             .add_system_set(self.0.on_update(handle_played))

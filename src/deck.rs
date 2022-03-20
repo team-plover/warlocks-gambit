@@ -1,19 +1,15 @@
 use bevy::prelude::{Plugin as BevyPlugin, *};
+#[cfg(feature = "debug")]
+use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use bevy_scene_hook::SceneHook;
 
 use crate::{
-    card::{Card, WordOfPower},
     scene::Scene,
     state::GameState,
-    war::Value,
+    war::{Card, Value, WordOfPower},
 };
 
-#[derive(Component)]
-pub struct PlayerDeck;
-
-#[derive(Component)]
-pub struct OppoDeck;
-
+#[cfg_attr(feature = "debug", derive(Inspectable))]
 struct Deck {
     cards: Vec<Card>,
 }
@@ -54,6 +50,16 @@ macro_rules! impl_deck_methods {
     )
 }
 
+#[cfg_attr(feature = "debug", derive(Inspectable))]
+#[derive(Component)]
+pub struct PlayerDeck(Deck);
+impl_deck_methods!(PlayerDeck);
+
+#[cfg_attr(feature = "debug", derive(Inspectable))]
+#[derive(Component)]
+pub struct OppoDeck(Deck);
+impl_deck_methods!(OppoDeck);
+
 macro_rules! cards {
     ($($value:tt $word:tt |)*) => (
         Deck::new(vec![ $( Card::new(cards!(@word $word), cards!(@val $value)) ,)* ])
@@ -75,11 +81,9 @@ macro_rules! cards {
     (@word z) => (Some(WordOfPower::Geh)); // 0 -> 12
 }
 
-pub struct PlayerDeckRes(Deck);
-impl_deck_methods!(PlayerDeckRes);
-impl PlayerDeckRes {
+impl PlayerDeck {
     #[rustfmt::skip]
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self(cards![
             7 s | 0 _ | 1 s |
             4 _ | 2 _ | 6 d |
@@ -91,11 +95,9 @@ impl PlayerDeckRes {
     }
 }
 
-pub struct OppoDeckRes(Deck);
-impl_deck_methods!(OppoDeckRes);
-impl OppoDeckRes {
+impl OppoDeck {
     #[rustfmt::skip]
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self(cards![
             8 _ | 7 _ | 6 _ |
             9 z | 5 d | 6 _ |
@@ -107,52 +109,68 @@ impl OppoDeckRes {
     }
 }
 
-// TODO: also change UV
+fn update_meshes(
+    (player_cards, oppo_cards): (usize, usize),
+    (player, oppo): (Entity, Entity),
+    meshes: &mut Assets<Mesh>,
+    meshes_q: &mut Query<(&Handle<Mesh>, &mut Visibility)>,
+) -> Option<()> {
+    // 18 -> 0.124 ; -- 0 -> -0.9
+    use bevy::render::mesh::VertexAttributeValues::{Float32x2, Float32x3};
+    let mut update_deck = |entity, card_count| {
+        let (handle, mut visibility) = meshes_q.get_mut(entity).ok()?;
+        visibility.is_visible = card_count != 0;
+        let mesh = meshes.get_mut(handle.clone())?;
+        if let Float32x3(positions) = mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION)? {
+            for pos in positions.iter_mut().filter(|v| v[1] > -0.901) {
+                pos[1] = card_count as f32 / 18.0 - 0.9;
+            }
+        }
+        if let Float32x2(uvs) = mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0)? {
+            // the > 0.218 is to only modify uv points for the sides of the deck,
+            // avoiding to modify the uv for the top and bottom face which are
+            // not concerned by the resize.
+            for point in uvs.iter_mut().filter(|p| p[0] > 0.218 && p[1] > 0.001) {
+                point[1] = card_count as f32 / 18. + 0.002;
+            }
+        }
+        Some(())
+    };
+    update_deck(player, player_cards)?;
+    update_deck(oppo, oppo_cards)?;
+    Some(())
+}
+
 fn resize_decks(
-    player_parent: Query<&Children, With<PlayerDeck>>,
-    oppo_parent: Query<&Children, With<OppoDeck>>,
-    meshes_q: Query<&Handle<Mesh>>,
-    player_deck: Res<PlayerDeckRes>,
-    oppo_deck: Res<OppoDeckRes>,
+    player_parent: Query<(&Children, &PlayerDeck)>,
+    oppo_parent: Query<(&Children, &OppoDeck)>,
+    mut meshes_q: Query<(&Handle<Mesh>, &mut Visibility)>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    use bevy::render::mesh::VertexAttributeValues::Float32x3;
-    let (player, oppo) = (player_parent.single(), oppo_parent.single());
-    if let (Ok(player), Ok(oppo)) = (meshes_q.get(player[0]), meshes_q.get(oppo[0])) {
-        if let Some(player) = meshes.get_mut(player.clone()) {
-            // 18 -> 0.124
-            // 0 -> -0.9
-            let player_cards = player_deck.remaining() as f32;
-            if let Some(Float32x3(positions)) = player.attribute_mut(Mesh::ATTRIBUTE_POSITION) {
-                for pos in positions.iter_mut().filter(|v| v[1] > -0.9) {
-                    pos[1] = player_cards / 18.0 - 0.9;
-                }
-            }
-        }
-        if let Some(oppo) = meshes.get_mut(oppo.clone()) {
-            // 18 -> 0.124
-            // 0 -> -0.9
-            let oppo_cards = oppo_deck.remaining() as f32;
-            if let Some(Float32x3(positions)) = oppo.attribute_mut(Mesh::ATTRIBUTE_POSITION) {
-                for pos in positions.iter_mut().filter(|v| v[1] > -0.9) {
-                    pos[1] = oppo_cards / 18.0 - 0.9;
-                }
-            }
-        }
-    }
+    let (player, player_deck) = player_parent.single();
+    let (oppo, oppo_deck) = oppo_parent.single();
+    update_meshes(
+        (player_deck.remaining(), oppo_deck.remaining()),
+        (player[0], oppo[0]),
+        &mut meshes,
+        &mut meshes_q,
+    );
+}
+
+fn reset_decks(mut player: Query<&mut PlayerDeck>, mut oppo: Query<&mut OppoDeck>) {
+    *player.single_mut() = PlayerDeck::new();
+    *oppo.single_mut() = OppoDeck::new();
 }
 
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(OppoDeckRes::new())
-            .insert_resource(PlayerDeckRes::new())
-            .add_system(resize_decks.with_run_criteria(Scene::when_spawned))
-            .add_system_set(
-                SystemSet::on_exit(self.0).with_system(|mut cmds: Commands| {
-                    cmds.insert_resource(OppoDeckRes::new());
-                    cmds.insert_resource(PlayerDeckRes::new());
-                }),
-            );
+        use crate::system_helper::EasySystemSetCtor;
+        #[cfg(feature = "debug")]
+        app.register_inspectable::<PlayerDeck>()
+            .register_inspectable::<OppoDeck>();
+
+        app.add_system(resize_decks.with_run_criteria(Scene::when_spawned))
+            .add_system_set(self.0.on_exit(reset_decks));
     }
 }
