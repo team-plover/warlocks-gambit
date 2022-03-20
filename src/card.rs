@@ -62,7 +62,7 @@ impl WordOfPower {
 }
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Component, Copy, PartialEq, Debug)]
 pub enum CardStatus {
     Normal,
     Hovered,
@@ -70,10 +70,10 @@ pub enum CardStatus {
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component, Clone, Debug)]
+#[non_exhaustive]
 pub struct Card {
     pub word: Option<WordOfPower>,
     pub value: Value,
-    status: CardStatus,
 }
 impl PartialEq for Card {
     fn eq(&self, other: &Self) -> bool {
@@ -94,11 +94,7 @@ impl Ord for Card {
 #[cfg(feature = "debug")]
 impl Default for Card {
     fn default() -> Self {
-        Self {
-            word: None,
-            value: Value::Zero,
-            status: CardStatus::Normal,
-        }
+        Self { word: None, value: Value::Zero }
     }
 }
 impl Card {
@@ -106,19 +102,14 @@ impl Card {
         use BattleOutcome::{Loss, Tie, Win};
         use WordOfPower::Zihbm;
         let swaps = |card: &Card| card.word == Some(Zihbm);
-        let swap = swaps(self) ^ swaps(other);
-        match (self.value.beats(&other.value), swap) {
+        match (self.value.beats(&other.value), swaps(self) ^ swaps(other)) {
             (Loss, false) | (Win, true) => Loss,
             (Loss, true) | (Win, false) => Win,
             (Tie, _) => Tie,
         }
     }
     pub fn new(word: Option<WordOfPower>, value: Value) -> Self {
-        let status = CardStatus::Normal;
-        Self { word, value, status }
-    }
-    pub fn set_status(&mut self, status: CardStatus) {
-        self.status = status;
+        Self { word, value }
     }
     pub fn max_value(&self) -> i32 {
         let value = self.value as i32;
@@ -134,15 +125,11 @@ impl Card {
 }
 
 #[derive(Component)]
-struct CardFace;
-#[derive(Component)]
-struct CardBack;
-#[derive(Component)]
-struct CardGlow;
-#[derive(Component)]
-struct CardWord;
-#[derive(Component)]
-struct CardValue;
+struct CardGraphics {
+    value: Entity,
+    glow: Entity,
+    word: Entity,
+}
 
 // TODO: make corner more bevelled
 #[rustfmt::skip]
@@ -174,101 +161,99 @@ impl<'w, 's> SpawnCard<'w, 's> {
         card: Card,
         from: Participant,
     ) -> EntityCommands<'w, 's, 'a> {
+        use WordOfPower::Egeq;
+
         let Card { value, word, .. } = card;
         let spawner_transform = match from {
             Participant::Oppo => self.oppo_deck.single(),
             Participant::Player => self.player_deck.single(),
         };
-        let mut card_entity = self.cmds.spawn_bundle((
-            card,
-            CardOrigin(from),
-            Name::new("Card"),
-            GlobalTransform::default(),
-            Transform {
-                scale: Vec3::splat(0.5),
-                translation: spawner_transform.translation,
-                rotation: spawner_transform.rotation * Quat::from_euler(XYZ, FRAC_PI_2, 0.0, 0.0),
-            },
-        ));
-        card_entity.with_children(|cmds| {
-            if let Some(word) = word {
-                cmds.spawn_bundle(PbrBundle {
-                    mesh: self.assets.quad.clone(),
-                    material: self.assets.words[word].clone(),
-                    transform: Transform::from_xyz(0.0, -0.8, 0.01)
-                        .with_scale(Vec3::new(1.5, 1.0, 1.0)),
-                    ..Default::default()
-                })
-                .insert_bundle((CardWord, Name::new("Word")));
-            }
-            cmds.spawn_bundle(PbrBundle {
-                mesh: self.assets.quad.clone(),
-                material: self.assets.values[value].clone(),
-                transform: Transform::from_xyz(0.0, 0.5, 0.01).with_scale(Vec3::new(1.0, 1.5, 1.0)),
-                ..Default::default()
-            })
-            .insert_bundle((CardValue, Name::new("Value")));
-            cmds.spawn_bundle(PbrBundle {
-                mesh: self.assets.card.clone(),
-                material: self.assets.frontface.clone(),
-                ..Default::default()
-            })
-            .insert_bundle((CardFace, Name::new("Front face")));
-            cmds.spawn_bundle(PbrBundle {
-                mesh: self.assets.card.clone(),
-                material: self.assets.backface.clone(),
-                transform: Transform::from_rotation(Quat::from_rotation_y(PI)),
-                ..Default::default()
-            })
-            .insert_bundle((CardBack, Name::new("Back face")));
-            cmds.spawn_bundle(PbrBundle {
-                mesh: self.assets.quad.clone(),
-                material: self.assets.glow.clone(),
+        let cmds = &mut self.cmds;
+        let entity = cmds
+            .spawn_bundle((
+                card,
+                CardOrigin(from),
+                Name::new("Card"),
+                GlobalTransform::default(),
+                Transform {
+                    scale: Vec3::splat(0.5),
+                    translation: spawner_transform.translation,
+                    rotation: spawner_transform.rotation
+                        * Quat::from_euler(XYZ, FRAC_PI_2, 0.0, 0.0),
+                },
+            ))
+            .id();
+        cmds.spawn_bundle(PbrBundle {
+            mesh: self.assets.card.clone(),
+            material: self.assets.frontface.clone(),
+            ..Default::default()
+        })
+        .insert_bundle((Parent(entity), Name::new("Front face")));
+        cmds.spawn_bundle(PbrBundle {
+            mesh: self.assets.card.clone(),
+            material: self.assets.backface.clone(),
+            transform: Transform::from_rotation(Quat::from_rotation_y(PI)),
+            ..Default::default()
+        })
+        .insert_bundle((Parent(entity), Name::new("Back face")));
+
+        let mut spawn_pbr = |name, pbr| {
+            cmds.spawn_bundle(pbr)
+                .insert_bundle((Parent(entity), Name::new(name)))
+                .id()
+        };
+        let default_card_pbr = |material: &Handle<StandardMaterial>| PbrBundle {
+            mesh: self.assets.quad.clone(),
+            material: material.clone(),
+            ..Default::default()
+        };
+        #[rustfmt::skip]
+        let graphics = CardGraphics {
+            word: spawn_pbr("Word", PbrBundle {
+                transform: Transform::from_xyz(0.0, -0.8, 0.01)
+                    .with_scale(Vec3::new(1.5, 1.0, 1.0)),
+                visibility: Visibility { is_visible: word.is_some() },
+                ..default_card_pbr(&self.assets.words[word.unwrap_or(Egeq)])
+            }),
+            value: spawn_pbr("Value", PbrBundle {
+                transform: Transform::from_xyz(0.0, 0.5, 0.01)
+                    .with_scale(Vec3::new(1.0, 1.5, 1.0)),
+                ..default_card_pbr(&self.assets.values[value])
+            }),
+            glow: spawn_pbr("Glow", PbrBundle {
                 transform: Transform::from_xyz(0.0, -0.8, 0.009)
                     .with_scale(Vec3::new(4.2, 2.2, 0.0)),
                 visibility: Visibility { is_visible: false },
-                ..Default::default()
-            })
-            .insert_bundle((CardGlow, Name::new("Glow")));
-        });
-        card_entity
+                ..default_card_pbr(&self.assets.glow)
+            }),
+        };
+        let mut ent = cmds.entity(entity);
+        ent.insert_bundle((CardStatus::Normal, graphics));
+        ent
     }
 }
 
 #[allow(clippy::type_complexity)]
 fn update_card(
-    cards: Query<(&Card, &Children), Changed<Card>>,
+    cards: Query<(&Card, &CardStatus, &CardGraphics), Or<(Changed<Card>, Changed<CardStatus>)>>,
     assets: Res<CardAssets>,
     mut mat_assets: ResMut<Assets<StandardMaterial>>,
-    mut face_mats: Query<&mut Handle<StandardMaterial>, (Without<CardWord>, With<CardValue>)>,
-    mut word_mats: Query<&mut Handle<StandardMaterial>, (With<CardWord>, Without<CardGlow>)>,
-    mut glow_mats: Query<
-        (&mut Visibility, &Handle<StandardMaterial>),
-        (With<CardGlow>, Without<CardValue>),
-    >,
+    mut mats: Query<(&mut Visibility, &mut Handle<StandardMaterial>)>,
 ) {
-    for (card, children) in cards.iter() {
-        for child in children.iter() {
-            if let Ok(mut mat) = face_mats.get_mut(*child) {
-                *mat = assets.values[card.value].clone();
-            }
-            if let (Ok(mut mat), Some(word)) = (word_mats.get_mut(*child), card.word) {
+    for (card, status, graphics) in cards.iter() {
+        if let Ok((_, mut mat)) = mats.get_mut(graphics.value) {
+            *mat = assets.values[card.value].clone();
+        }
+        if let Ok((mut vis, mut mat)) = mats.get_mut(graphics.word) {
+            vis.is_visible = card.word.is_some();
+            if let Some(word) = card.word {
                 *mat = assets.words[word].clone();
             }
-            match (card.status, glow_mats.get_mut(*child), card.word) {
-                (CardStatus::Hovered, Ok((mut visible, mat)), Some(word)) => {
-                    let mut mat = mat_assets.get_mut(mat).unwrap();
-                    mat.emissive = word.color();
-                    visible.is_visible = true;
-                }
-                (_, Ok((mut visible, _)), None) => {
-                    visible.is_visible = false;
-                }
-                (CardStatus::Normal, Ok((mut visible, _)), _) => {
-                    visible.is_visible = false;
-                }
-                _ => {}
-            }
+        }
+        if let (Ok((mut vis, mat)), Some(word)) = (mats.get_mut(graphics.glow), card.word) {
+            let mut mat = mat_assets.get_mut(mat.clone()).unwrap();
+            mat.emissive = word.color();
+            vis.is_visible = *status == CardStatus::Hovered;
         }
     }
 }

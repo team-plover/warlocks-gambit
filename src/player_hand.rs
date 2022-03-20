@@ -12,7 +12,7 @@ use crate::{
     animate::{Animated, DisableAnimation},
     audio::AudioRequest::{self, PlayShuffleLong, PlayShuffleShort},
     camera::PlayerCam,
-    card::{Card, CardStatus, SpawnCard},
+    card::{CardStatus, SpawnCard},
     cheat::{CheatEvent, SleeveCard},
     deck::PlayerDeck,
     game_flow::PlayCard,
@@ -112,11 +112,13 @@ fn update_raycast(
     }
 }
 
+// TODO: disable hovering other cards when we are holding one down
+// (this would fix #7)
 /// Set the [`HoverStatus`] of cards
 fn select_card(
     mut cursor: EventReader<CursorMoved>,
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
-    mut hand_cards: Query<(Entity, &mut Card, &mut HandCard)>,
+    mut hand_cards: Query<(Entity, &mut CardStatus, &mut HandCard)>,
     mut audio: EventWriter<AudioRequest>,
 ) {
     use HoverStatus::{Dragging, Hovered};
@@ -126,15 +128,15 @@ fn select_card(
         if !has_cursor_moved {
             return;
         }
-        for (entity, mut card, mut hand_card) in hand_cards.iter_mut() {
+        for (entity, mut status, mut hand_card) in hand_cards.iter_mut() {
             if entity == hovered_card && hand_card.hover != Dragging {
-                card.set_status(CardStatus::Hovered);
+                *status = CardStatus::Hovered;
                 if hand_card.hover != Hovered {
                     audio.send(PlayShuffleShort);
                 }
                 hand_card.hover = Hovered;
             } else if hand_card.hover != Dragging {
-                card.set_status(CardStatus::Normal);
+                *status = CardStatus::Normal;
                 hand_card.hover = HoverStatus::None;
             }
         }
@@ -151,7 +153,7 @@ fn play_card(
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
     mut card_events: EventWriter<PlayCard>,
     mut cmds: Commands,
-    mut hand_cards: Query<(Entity, &mut Card, &mut HandCard, &mut Transform)>,
+    mut hand_cards: Query<(Entity, &mut CardStatus, &mut HandCard, &mut Transform)>,
     mut hand_events: EventWriter<HandEvent>,
     mut cheat_events: EventWriter<CheatEvent>,
     mut card_drawer: DrawParams,
@@ -159,7 +161,7 @@ fn play_card(
 ) {
     use HoverStatus::{Dragging, Hovered};
     let query = hand_raycaster.get_single().map(|ray| ray.intersect_top());
-    for (entity, mut card, mut hand_card, mut trans) in hand_cards.iter_mut() {
+    for (entity, mut status, mut hand_card, mut trans) in hand_cards.iter_mut() {
         match hand_card.hover {
             Hovered if mouse.just_pressed(MouseButton::Left) => {
                 let hovered_card = if let Ok(Some((e, _))) = query { e } else { break };
@@ -176,13 +178,13 @@ fn play_card(
                 let can_sleeve = sleeve_cards.iter().count() < 3 && cards_remaining;
                 cmds.entity(entity).remove::<GrabbedCard>();
                 if cursor_pos.x < -1.0 && cursor_pos.y < 4.7 && can_sleeve {
-                    card.set_status(CardStatus::Normal);
+                    *status = CardStatus::Normal;
                     cmds.entity(entity).remove::<HandCard>();
                     cheat_events.send(CheatEvent::HideInSleeve(entity));
                     hand_events.send(HandEvent::LowerSleeve);
                     card_drawer.draw(1);
                 } else if cursor_pos.x > 0.2 || cursor_pos.y > 6.0 {
-                    card.set_status(CardStatus::Normal);
+                    *status = CardStatus::Normal;
                     cmds.entity(entity).remove::<HandCard>();
                     cmds.entity(entity).remove::<RayCastMesh<HandRaycast>>();
                     card_events.send(PlayCard::new(entity, Participant::Player));
