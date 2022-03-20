@@ -2835,7 +2835,7 @@ dependencies = [
 
 [[package]]
 name = "warlocks-gambit"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "bevy",
  "bevy-debug-text-overlay",
