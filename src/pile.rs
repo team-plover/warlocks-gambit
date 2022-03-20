@@ -43,6 +43,9 @@ impl Pile {
     pub fn new(which: PileType) -> Self {
         Self { which, stack: Vec::new() }
     }
+    pub fn cards(&self) -> &[Entity] {
+        &self.stack
+    }
 }
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
