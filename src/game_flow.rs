@@ -232,7 +232,7 @@ fn handle_played(
         let msg = "War pile exists";
         let mut pile = pile.iter_mut().find(|p| p.which == War).expect(msg);
         cmds.entity(*card)
-            .insert_bundle((pile.additional_card(), PlayedCard));
+            .insert_bundle((pile.add_existing(*card), PlayedCard));
         let card_word = cards.get(*card).map(|c| c.word);
         audio_events.send(AudioRequest::PlayShuffleLong);
         if let Ok(Some(word)) = card_word {
@@ -277,6 +277,7 @@ fn handle_turn_end(
     mut score_bonuses: ResMut<ScoreBonuses>,
 ) {
     use Participant::{Oppo, Player};
+    use PileType::War;
 
     let war_pile: Vec<_> = played_cards.iter().collect();
 
@@ -284,8 +285,10 @@ fn handle_turn_end(
     let mut add_card_to_pile = |(_, _, card, entity): QueryItem<CardsQuery>, who: Participant| {
         let mut pile = piles.iter_mut().find(|p| p.which == who.into()).unwrap();
         cmds.entity(entity)
-            .insert(pile.additional_card())
+            .insert(pile.add_existing(entity))
             .remove::<PlayedCard>();
+        let mut old_pile = piles.iter_mut().find(|p| p.which == War).unwrap();
+        old_pile.remove(entity);
         let multi = turn_effects.multiplier - 1;
         // TODO: this is broken with the SWAP modifier I think?
         let zero_bonus = card.value == Value::Zero && turn_effects.zero_bonus;
