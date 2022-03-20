@@ -59,10 +59,12 @@ fn chose_card(
     mut cmds: Commands,
     mut card_events: EventWriter<PlayCard>,
     cards: Query<(Entity, &Card), With<OppoCard>>,
+    mut card_transform: Query<&mut Transform, With<OppoCard>>,
     war_card: Query<&Card, With<PlayedCard>>,
 ) {
     use BattleOutcome::{Loss, Win};
     use WordOfPower::Zihbm;
+
     let in_hand: Vec<_> = cards.iter().collect();
     let selected = match war_card.get_single() {
         Ok(war_card) => {
@@ -95,6 +97,9 @@ fn chose_card(
             in_hand[selected_index].0
         }
     };
+    // Offset up the card so that it doesn't go through the already-played one
+    let mut trans = card_transform.get_mut(selected).unwrap();
+    trans.translation.y += 1.0;
     cmds.entity(selected).remove::<OppoCard>();
     card_events.send(PlayCard::new(selected, Participant::Oppo));
 }

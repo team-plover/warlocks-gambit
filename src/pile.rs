@@ -76,7 +76,9 @@ fn move_to_pile(
                 let pile_pos = pile_transform.translation;
                 let target = pile_pos + offset.translation + Vec3::Y * stack_pos;
                 let origin = transform.translation;
-                transform.translation += (target - origin) * card_speed;
+                // give cool effect of falling
+                let trans_speed = Vec3::new(1., 0.7, 1.) * card_speed;
+                transform.translation += (target - origin) * trans_speed;
 
                 let target = pile_transform.rotation * offset.rotation;
                 let origin = transform.rotation;
