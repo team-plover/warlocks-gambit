@@ -52,6 +52,14 @@ impl Value {
     }
 }
 
+/// Additional effects of cards.
+///
+/// ## Card effects
+///
+/// * `Egeq`: Give an extra seed to the player.
+/// * `Qube`: Double points.
+/// * `Geh`: Card of [`Value::Zero`] earns 12 points.
+/// * `Zihbm`: The winner is swapped.
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Enum, Clone, Copy, Debug, PartialEq)]
 pub enum WordOfPower {
@@ -139,5 +147,58 @@ impl Card {
             _ => 0,
         };
         word_max_bonus + value
+    }
+    pub fn bonus_points(&self, other: &Self) -> (i32, i32) {
+        use Value::Zero;
+        use WordOfPower::{Geh, Qube};
+        let is_word = |c: &Self, word| (c.word == Some(word)) as i32;
+        let is_zero = |c: &Self| if c.value == Zero { 1 } else { 0 };
+        let zero_bonus = 12 * (is_word(self, Geh) + is_word(other, Geh));
+        let zero_bonus = |c| is_zero(c) * zero_bonus;
+        let mul_bonus = is_word(self, Qube) + is_word(other, Qube);
+        (
+            zero_bonus(self) * (mul_bonus + 1) + self.value as i32 * mul_bonus,
+            zero_bonus(other) * (mul_bonus + 1) + other.value as i32 * mul_bonus,
+        )
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! bonus_for {
+        (@card $value:tt $word:tt) => (
+             Card::new(bonus_for!(@word $word), bonus_for!(@val $value))
+        );
+        (@val 0) => (Value::Zero);
+        (@val 1) => (Value::One);
+        (@val 2) => (Value::Two);
+        (@val 3) => (Value::Three);
+        (@val 4) => (Value::Four);
+        (@val 5) => (Value::Five);
+        (@val 6) => (Value::Six);
+        (@val 7) => (Value::Seven);
+        (@val 8) => (Value::Eight);
+        (@val 9) => (Value::Nine);
+        (@word _) => (None);
+        (@word s) => (Some(WordOfPower::Egeq)); // Seed
+        (@word d) => (Some(WordOfPower::Qube)); // Double
+        (@word w) => (Some(WordOfPower::Zihbm)); // Swap
+        (@word z) => (Some(WordOfPower::Geh)); // 0 -> 12
+        ($lval:tt $lword:tt , $rval:tt $rword:tt) => (
+            bonus_for!(@card $lval $lword).bonus_points(&bonus_for!(@card $rval $rword))
+        );
+    }
+    #[test]
+    fn bonus_point_test() {
+        assert_eq!((0, 0), bonus_for!(9 _, 9 _));
+        assert_eq!((12, 0), bonus_for!(0 z, 9 _));
+        assert_eq!((12, 0), bonus_for!(0 _, 9 z));
+        assert_eq!((24, 0), bonus_for!(0 z, 9 z));
+        assert_eq!((24, 9), bonus_for!(0 z, 9 d));
+        assert_eq!((24, 9), bonus_for!(0 d, 9 z));
+        assert_eq!((0, 2), bonus_for!(0 d, 1 d));
+        assert_eq!((1, 1), bonus_for!(1 d, 1 _));
+        assert_eq!((2, 2), bonus_for!(1 d, 1 d));
     }
 }
