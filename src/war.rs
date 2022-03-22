@@ -6,6 +6,23 @@ use bevy::prelude::{Color, Component};
 use bevy_inspector_egui::Inspectable;
 use enum_map::Enum;
 
+#[derive(Clone, PartialEq, Debug)]
+pub enum ParseError {
+    BadValue(String),
+    BadWord(String),
+    EmptyWord,
+}
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseError::EmptyWord => write!(f, "The word is specified as non-existing"),
+            ParseError::BadWord(word) => write!(f, "The word {word} is invalid"),
+            ParseError::BadValue(value) => write!(f, "The value {value} is invalid"),
+        }
+    }
+}
+impl std::error::Error for ParseError {}
+
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub enum BattleOutcome {
     Loss,
@@ -53,7 +70,7 @@ impl Value {
     }
 }
 impl FromStr for Value {
-    type Err = ();
+    type Err = ParseError;
     #[rustfmt::skip]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use Value::*;
@@ -61,7 +78,7 @@ impl FromStr for Value {
             "0" => Ok(Zero),  "1" => Ok(One),   "2" => Ok(Two),
             "3" => Ok(Three), "4" => Ok(Four),  "5" => Ok(Five),
             "6" => Ok(Six),   "7" => Ok(Seven), "8" => Ok(Eight),
-            "9" => Ok(Nine),  _ => Err(()),
+            "9" => Ok(Nine),  _ => Err(ParseError::BadValue(s.to_owned())),
         }
     }
 }
@@ -108,14 +125,16 @@ impl WordOfPower {
     }
 }
 impl FromStr for WordOfPower {
-    type Err = ();
+    type Err = ParseError;
     #[rustfmt::skip]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use WordOfPower::*;
         match s {
             "seed" | "s" => Ok(Egeq),  "doub" | "d" => Ok(Qube),
             "swap" | "w" => Ok(Zihbm), "zero" | "z" => Ok(Geh),
-            "het" => Ok(Het), "meb" => Ok(Meb), _ => Err(()),
+            "____" | "_" => Err(ParseError::EmptyWord),
+            "het" => Ok(Het), "meb" => Ok(Meb),
+            _ => Err(ParseError::BadWord(s.to_owned())),
         }
     }
 }
@@ -150,10 +169,15 @@ impl Default for Card {
     }
 }
 impl FromStr for Card {
-    type Err = ();
+    type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use ParseError::EmptyWord;
         let (value, word) = s.split_at(1);
-        Ok(Card { value: value.parse()?, word: word.parse().ok() })
+        let word = word.parse().map_or_else(
+            |err| if matches!(err, EmptyWord) { Ok(None) } else { Err(err) },
+            |word| Ok(Some(word)),
+        );
+        Ok(Card { value: value.parse()?, word: word? })
     }
 }
 impl Card {

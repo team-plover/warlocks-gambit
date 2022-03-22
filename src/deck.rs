@@ -1,14 +1,45 @@
+//! The game deck, deck loading from files and drawing cards from deck.
+//!
+//! We define a custom [`Deck`] asset with a custom loader [`DeckLoader`], this
+//! way it is possible for the player to change the decks defined in
+//! `assets/decks/*.deck`, and it is also possible to hot-reload the decks for
+//! quicker iteration time.
 use std::str::FromStr;
 
-use bevy::prelude::{Plugin as BevyPlugin, *};
+use bevy::{
+    asset::{AssetLoader, LoadContext, LoadedAsset},
+    prelude::{Plugin as BevyPlugin, *},
+    reflect::TypeUuid,
+    utils::BoxedFuture,
+};
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
-use bevy_scene_hook::SceneHook;
+use bevy_scene_hook::world::SceneHook;
 
-use crate::{scene::Scene, state::GameState, war::Card};
+use crate::{
+    scene::Scene,
+    state::GameState,
+    war::{Card, ParseError},
+};
+
+pub struct DeckAssets {
+    pub player: Handle<Deck>,
+    pub oppo: Handle<Deck>,
+}
+impl FromWorld for DeckAssets {
+    fn from_world(world: &mut World) -> Self {
+        let assets = world.get_resource::<AssetServer>().unwrap();
+        Self {
+            player: assets.load("decks/player.deck"),
+            oppo: assets.load("decks/oppo.deck"),
+        }
+    }
+}
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
-struct Deck {
+#[derive(Debug, TypeUuid, Clone)]
+#[uuid = "010293ef-dc29-4d94-aae1-39da45947644"]
+pub struct Deck {
     cards: Vec<Card>,
 }
 impl Deck {
@@ -29,13 +60,31 @@ impl Deck {
     }
 }
 impl FromStr for Deck {
-    type Err = ();
+    type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let deck = s
             .split_ascii_whitespace()
             .map(|s| s.parse())
             .collect::<Result<_, _>>()?;
         Ok(Self::new(deck))
+    }
+}
+#[derive(Default)]
+pub struct DeckLoader;
+impl AssetLoader for DeckLoader {
+    fn load<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        load_context: &'a mut LoadContext,
+    ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
+        Box::pin(async move {
+            let deck: Deck = std::str::from_utf8(bytes)?.parse()?;
+            load_context.set_default_asset(LoadedAsset::new(deck));
+            Ok(())
+        })
+    }
+    fn extensions(&self) -> &[&str] {
+        &["deck"]
     }
 }
 
@@ -45,6 +94,15 @@ macro_rules! impl_deck_methods {
             impl_deck_methods!(@method score((&)) -> i32);
             impl_deck_methods!(@method draw((&mut), count: usize) -> Vec<Card>);
             impl_deck_methods!(@method remaining((&)) -> usize);
+            pub fn new(deck: Deck) -> Self {
+                Self(deck)
+            }
+            pub fn reset(&mut self, handle: &Handle<Deck>, decks: &Assets<Deck>) {
+                self.0 = decks
+                    .get(handle.clone())
+                    .expect("Deck already loaded")
+                    .clone();
+            }
         }
     );
     (@method $name:ident (
@@ -67,30 +125,6 @@ impl_deck_methods!(PlayerDeck);
 #[derive(Component)]
 pub struct OppoDeck(Deck);
 impl_deck_methods!(OppoDeck);
-
-impl PlayerDeck {
-    pub fn new() -> Self {
-        let deck = "7s  0_  1s
-                    4_  2_  6d
-                    6s  8w  0z
-                    2s  3_  4_
-                    3_  9z  1d
-                    5w  4_  3_";
-        Self(deck.parse().unwrap())
-    }
-}
-
-impl OppoDeck {
-    pub fn new() -> Self {
-        let deck = "8_  7_  6_ 
-                    9z  5d  6_ 
-                    8_  9_  6_ 
-                    7_  1w  5_ 
-                    9d  0w  5_ 
-                    1d  6d  5_";
-        Self(deck.parse().unwrap())
-    }
-}
 
 fn update_meshes(
     (player_cards, oppo_cards): (usize, usize),
@@ -140,9 +174,14 @@ fn resize_decks(
     );
 }
 
-fn reset_decks(mut player: Query<&mut PlayerDeck>, mut oppo: Query<&mut OppoDeck>) {
-    *player.single_mut() = PlayerDeck::new();
-    *oppo.single_mut() = OppoDeck::new();
+fn reset_decks(
+    mut player: Query<&mut PlayerDeck>,
+    mut oppo: Query<&mut OppoDeck>,
+    decks: Res<Assets<Deck>>,
+    deck_handles: Res<DeckAssets>,
+) {
+    player.single_mut().reset(&deck_handles.player, &decks);
+    oppo.single_mut().reset(&deck_handles.oppo, &decks);
 }
 
 pub struct Plugin(pub GameState);
@@ -153,7 +192,10 @@ impl BevyPlugin for Plugin {
         app.register_inspectable::<PlayerDeck>()
             .register_inspectable::<OppoDeck>();
 
-        app.add_system(resize_decks.with_run_criteria(Scene::when_spawned))
+        app.add_asset::<Deck>()
+            .init_asset_loader::<DeckLoader>()
+            .init_resource::<DeckAssets>()
+            .add_system(resize_decks.with_run_criteria(Scene::when_spawned))
             .add_system_set(self.0.on_exit(reset_decks));
     }
 }

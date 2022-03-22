@@ -246,9 +246,9 @@ dependencies = [
 
 [[package]]
 name = "bevy-scene-hook"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d51842a9f5d9b2334bb85a49b719f441cc67027d16aacad7cb584e0aba6a8036"
+checksum = "7bb76135db2c34185de9a7355d5b04079ed591aeeabc17df9a9ef4546dc4f2ec"
 dependencies = [
  "bevy",
 ]
@@ -2837,6 +2837,7 @@ dependencies = [
 name = "warlocks-gambit"
 version = "1.2.0"
 dependencies = [
+ "anyhow",
  "bevy",
  "bevy-debug-text-overlay",
  "bevy-inspector-egui",

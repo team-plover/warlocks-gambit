@@ -84,6 +84,7 @@ fn index_of<T: PartialEq>(t: &T, slice: &[T]) -> usize {
 
 /// Chose from cards in hand which one to play.
 fn chose_card(played: Option<&Card>, in_hand: &[Card]) -> usize {
+    // TODO: replace all logic by simple call to Card::bonus_points
     use BattleOutcome::{Tie, Win};
     use Value::Zero;
     use WordOfPower::Geh;
@@ -124,9 +125,6 @@ mod tests {
     use super::*;
 
     macro_rules! cards {
-        (hand: $($card:tt),+) => (
-            (None, [ $(stringify!($card).parse().unwrap(),)+ ])
-        );
         (war $war:tt ; hand: $($hand:tt),+) => ({
             let war: Card = stringify!($war).parse().unwrap();
             (Some(war), [ $(stringify!($hand).parse().unwrap(),)+ ])
