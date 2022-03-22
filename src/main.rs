@@ -18,13 +18,6 @@ mod war;
 
 use state::{GameState, TurnState};
 
-mod camera {
-    use bevy::prelude::Component;
-
-    #[derive(Component)]
-    pub struct PlayerCam;
-}
-
 #[derive(Clone, Copy, PartialEq)]
 pub enum Participant {
     Player,

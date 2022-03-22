@@ -1,15 +1,15 @@
 use bevy::prelude::{Plugin as BevyPlugin, *};
+use bevy_mod_raycast::RayCastSource;
 use bevy_scene_hook::{world::SceneHook as WorldSceneHook, SceneInstance};
 
 use crate::{
     animate::Animated,
-    camera::PlayerCam,
     card::{OppoCardSpawner, PlayerCardSpawner},
     cheat::{BirdPupil, BirdPupilRoot, PlayerSleeve},
     deck::{Deck, DeckAssets, OppoDeck, PlayerDeck},
     oppo_hand::OppoHand,
     pile::{Pile, PileType},
-    player_hand::PlayerHand,
+    player_hand::{HandDisengageArea, HandRaycast, PlayerHand, SleeveArea},
 };
 
 pub enum Scene {}
@@ -32,7 +32,11 @@ impl WorldSceneHook for Scene {
         }
         let mut cmds = world.entity_mut(entity);
         match name.as_str() {
-            "PlayerPerspective_Orientation" => cmds.insert(PlayerCam),
+            "PlayerPerspective_Orientation" => cmds.insert_bundle((
+                RayCastSource::<HandRaycast>::new(),
+                RayCastSource::<SleeveArea>::new(),
+                RayCastSource::<HandDisengageArea>::new(),
+            )),
             "PlayerCardSpawn" => cmds.insert(PlayerCardSpawner),
             "OppoCardSpawn" => cmds.insert(OppoCardSpawner),
             "OppoHand" => cmds.insert_bundle((OppoHand, Animated::bob(1.0, 0.3, 6.0))),

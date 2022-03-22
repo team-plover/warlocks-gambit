@@ -12,7 +12,6 @@ use bevy_mod_raycast::{DefaultRaycastingPlugin, RayCastMesh, RayCastMethod, RayC
 use crate::{
     animate::DisableAnimation,
     audio::AudioRequest::{self, PlayShuffleLong, PlayShuffleShort},
-    camera::PlayerCam,
     card::{CardStatus, SpawnCard},
     cheat::{CheatEvent, SleeveCard},
     deck::PlayerDeck,
@@ -28,7 +27,15 @@ pub struct PlayerHand;
 #[derive(Component)]
 pub struct GrabbedCard;
 
-enum HandRaycast {}
+/// Mesh for selecting the card
+pub enum HandRaycast {}
+
+/// Marks the mesh that represents where if we disengage the card (relese the
+/// grab button), it will go back into the hand.
+pub enum HandDisengageArea {}
+
+/// Where if we disengage the card, the card will fall into the sleeve.
+pub enum SleeveArea {}
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component)]
@@ -110,14 +117,8 @@ fn draw_hand(
     mut card_drawer: DrawParams,
     mut cmds: Commands,
     sleeve_cards: Query<Entity, With<SleeveCard>>,
-    cam: Query<Entity, With<PlayerCam>>,
     parents: Query<(Entity, &Parent), (With<Underlay>, With<RayCastMesh<HandRaycast>>)>,
 ) {
-    // NOTE: could have been done in scene.rs, but I prefer to keep the
-    // HandRaycast type private
-    let raycast_source = RayCastSource::<HandRaycast>::new();
-    cmds.entity(cam.single()).insert(raycast_source);
-
     let underlay_of = |e| parents.iter().find_map(|(c, p)| (p.0 == e).then(|| c));
     let unsleeved: Vec<_> = sleeve_cards.iter().collect();
     card_drawer.draw(3 - unsleeved.len());
