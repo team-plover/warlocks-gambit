@@ -69,7 +69,12 @@ fn main() {
         .add_plugins(DefaultPlugins);
 
     #[cfg(feature = "debug")]
-    app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new());
+    app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new())
+        .add_plugin(bevy::pbr::wireframe::WireframePlugin)
+        .insert_resource(bevy::render::options::WgpuOptions {
+            features: bevy::render::render_resource::WgpuFeatures::POLYGON_MODE_LINE,
+            ..Default::default()
+        });
 
     app.insert_resource(ClearColor(Color::rgb(0.293, 0.3828, 0.4023)))
         .init_resource::<GameStarts>()

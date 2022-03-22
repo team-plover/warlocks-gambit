@@ -61,7 +61,7 @@ const CARD_EDGES: [u16; 30] = [
 
 #[derive(SystemParam)]
 pub struct SpawnCard<'w, 's> {
-    cmds: Commands<'w, 's>,
+    pub cmds: Commands<'w, 's>,
     assets: Res<'w, CardAssets>,
     player_deck: Query<'w, 's, &'static GlobalTransform, With<PlayerCardSpawner>>,
     oppo_deck: Query<'w, 's, &'static GlobalTransform, With<OppoCardSpawner>>,

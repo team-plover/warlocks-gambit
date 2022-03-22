@@ -2,6 +2,7 @@ use std::f32::consts::FRAC_PI_4;
 
 use bevy::{
     ecs::{query::QueryItem, system::SystemParam},
+    pbr::wireframe::Wireframe,
     prelude::{Plugin as BevyPlugin, *},
 };
 #[cfg(feature = "debug")]
@@ -34,19 +35,38 @@ enum HandRaycast {}
 struct HandCard {
     index: usize,
     dragging: bool,
+    underlay: Entity,
 }
 impl HandCard {
-    fn new(index: usize) -> Self {
-        Self { index, dragging: false }
+    fn new(index: usize, underlay: Entity) -> Self {
+        Self { index, underlay, dragging: false }
     }
 }
 
-// TODO: do not re-highlight the previously highlighted card until cursor has
-// been away from it for at least 0.3 seconds
+struct CardCollisionAssets {
+    bounding_box: Handle<Mesh>,
+    underlay: Handle<Mesh>,
+}
+impl FromWorld for CardCollisionAssets {
+    fn from_world(world: &mut World) -> Self {
+        let mut meshes = world.get_resource_mut::<Assets<Mesh>>().unwrap();
+        Self {
+            bounding_box: meshes.add(shape::Quad::new(Vec2::new(2.3, 3.3)).into()),
+            underlay: meshes.add(shape::Quad::new(Vec2::new(2.4, 6.3)).into()),
+        }
+    }
+}
+
+// Underlay mesh is for preventing cards going up/down very fast when hovering over two
+// of them at the same time. It acts as a screen that prevents raycasts from reaching
+// under it. By enabling/disabling visibility, it's possible to enable/disable the underlay.
+#[derive(Component)]
+struct Underlay;
+
 #[derive(SystemParam)]
 struct DrawParams<'w, 's> {
     card_spawner: SpawnCard<'w, 's>,
-    meshes: ResMut<'w, Assets<Mesh>>,
+    assets: Res<'w, CardCollisionAssets>,
     deck: Query<'w, 's, &'static mut PlayerDeck>,
     audio: EventWriter<'w, 's, AudioRequest>,
 }
@@ -57,13 +77,27 @@ impl<'w, 's> DrawParams<'w, 's> {
     fn draw(&mut self, count: usize) {
         self.audio.send(PlayShuffleLong);
         for (i, card) in self.deck().draw(count).into_iter().enumerate() {
+            let cmds = &mut self.card_spawner.cmds;
+            let underlay = cmds
+                .spawn_bundle((
+                    Transform::from_xyz(0.0, 0.0, -0.001),
+                    GlobalTransform::default(),
+                    RayCastMesh::<HandRaycast>::default(),
+                    self.assets.underlay.clone(),
+                    Visibility { is_visible: false },
+                    Wireframe,
+                    Underlay,
+                    ComputedVisibility::default(),
+                ))
+                .id();
             self.card_spawner
                 .spawn_card(card, Participant::Player)
+                .add_child(underlay)
                 .insert_bundle((
-                    HandCard::new(i),
+                    HandCard::new(i, underlay),
+                    Wireframe,
                     RayCastMesh::<HandRaycast>::default(),
-                    self.meshes
-                        .add(shape::Quad::new(Vec2::new(2.3, 3.3)).into()),
+                    self.assets.bounding_box.clone(),
                     Visibility::default(),
                     ComputedVisibility::default(),
                 ));
@@ -71,23 +105,26 @@ impl<'w, 's> DrawParams<'w, 's> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn draw_hand(
     mut card_drawer: DrawParams,
     mut cmds: Commands,
     sleeve_cards: Query<Entity, With<SleeveCard>>,
     cam: Query<Entity, With<PlayerCam>>,
+    parents: Query<(Entity, &Parent), (With<Underlay>, With<RayCastMesh<HandRaycast>>)>,
 ) {
     // NOTE: could have been done in scene.rs, but I prefer to keep the
     // HandRaycast type private
     let raycast_source = RayCastSource::<HandRaycast>::new();
     cmds.entity(cam.single()).insert(raycast_source);
 
+    let underlay_of = |e| parents.iter().find_map(|(c, p)| (p.0 == e).then(|| c));
     let unsleeved: Vec<_> = sleeve_cards.iter().collect();
     card_drawer.draw(3 - unsleeved.len());
     for entity in unsleeved.into_iter() {
         cmds.entity(entity)
             .remove::<SleeveCard>()
-            .insert(HandCard::new(0));
+            .insert(HandCard::new(0, underlay_of(entity).unwrap()));
     }
 }
 
@@ -115,6 +152,10 @@ fn hover_card(
     }
     let query = hand_raycaster.get_single().map(|ray| ray.intersect_top());
     if let Ok(Some((card_under_cursor, _))) = query {
+        // Does not have `CardStatus` component, meaning it's an underlay, so do nothing
+        if hand_cards.get(card_under_cursor).is_err() {
+            return;
+        }
         for (entity, mut hover) in hand_cards.iter_mut() {
             let is_under_cursor = entity == card_under_cursor;
             let is_hovering = *hover == CardStatus::Hovered;
@@ -248,7 +289,7 @@ fn update_hand(
 ) {
     let card_speed = 10.0 * time.delta_seconds();
     let hand_transform = hand.single();
-    let hand_pos = hand_transform.translation;
+    let (hand_pos, hand_rot) = (hand_transform.translation, hand_transform.rotation);
     let not_dragging = |c: &QueryItem<HoverQuery>| !c.2.dragging;
     for (mut transform, hover, HandCard { index, .. }) in cards.iter_mut().filter(not_dragging) {
         let is_hovering = *hover == CardStatus::Hovered;
@@ -256,8 +297,9 @@ fn update_hand(
         let hover_mul = if is_hovering { 2.0 } else { 1.0 };
         let y_offset = i_f32.cos() * hover_mul;
         let x_offset = i_f32.sin() * hover_mul;
-        let z_offset = if is_hovering { 0.01 } else { i_f32 * -0.01 };
-        let target = hand_pos + Vec3::new(x_offset - 0.3, y_offset, z_offset + 0.05);
+        let z_offset = i_f32 * -0.01;
+        let target = Vec3::new(x_offset - 0.3, y_offset, z_offset + 0.05);
+        let target = hand_pos + hand_rot * target;
         let origin = transform.translation;
         transform.translation += (target - origin) * card_speed;
 
@@ -279,6 +321,16 @@ fn update_hand_indexes(mut cards: Query<&mut HandCard>) {
     }
 }
 
+fn hovered_covers_previous_position(
+    mut underlay_visibilities: Query<&mut Visibility, With<Underlay>>,
+    statuses: Query<(&HandCard, &CardStatus), Changed<CardStatus>>,
+) {
+    for (HandCard { underlay, .. }, status) in statuses.iter() {
+        let mut underlay_vis = underlay_visibilities.get_mut(*underlay).unwrap();
+        underlay_vis.is_visible = matches!(*status, CardStatus::Hovered);
+    }
+}
+
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
@@ -286,10 +338,12 @@ impl BevyPlugin for Plugin {
         app.register_inspectable::<HandCard>();
         app.add_plugin(DefaultRaycastingPlugin::<HandRaycast>::default())
             .add_event::<HandEvent>()
+            .init_resource::<CardCollisionAssets>()
             .add_system_set(SystemSet::on_enter(TurnState::Draw).with_system(draw_hand))
             .add_system_set(
                 SystemSet::on_update(TurnState::Player)
                     .with_system(hover_card.label("select"))
+                    .with_system(hovered_covers_previous_position)
                     .with_system(play_card.label("play").after("select"))
                     .with_system(update_raycast),
             )
