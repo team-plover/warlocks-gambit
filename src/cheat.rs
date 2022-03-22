@@ -74,7 +74,6 @@ fn control_bird_pupil(
 }
 
 fn execute_cheat(
-    sleeve: Query<&GlobalTransform, With<PlayerSleeve>>,
     game_starts: Res<GameStarts>,
     mut bird_eye: Query<&mut Animated, With<BirdPupilRoot>>,
     mut gameover_events: EventWriter<GameOver>,
@@ -101,18 +100,32 @@ fn execute_cheat(
                 gameover_events.send(GameOver(EndReason::CaughtCheating));
             }
             CheatEvent::HideInSleeve(entity) => {
-                let mut target: Transform = (*sleeve.single()).into();
-                target.translation -= Vec3::Y * 1.5;
                 if let Ok(mut anim) = bird_eye.get_single_mut() {
                     *anim = Animated::Static;
                 }
                 watch.is_watching = true;
                 ui.send(EffectEvent::EndCheat);
-                cmds.entity(*entity)
-                    .insert(SleeveCard)
-                    .insert(Animated::MoveInto { target, speed: 1.0 });
+                cmds.entity(*entity).insert(SleeveCard);
             }
         }
+    }
+}
+
+fn follow_sleeve(
+    mut cards: Query<&mut Transform, With<SleeveCard>>,
+    sleeve: Query<&GlobalTransform, With<PlayerSleeve>>,
+    time: Res<Time>,
+) {
+    let card_speed = 10.0 * time.delta_seconds();
+    for mut transform in cards.iter_mut() {
+        let sleeve_pos = sleeve.single();
+        let target = sleeve_pos.translation;
+        let origin = transform.translation;
+        transform.translation += (target - origin) * card_speed;
+
+        let target = sleeve_pos.rotation;
+        let origin = transform.rotation;
+        transform.rotation = origin.lerp(target, card_speed);
     }
 }
 
@@ -123,6 +136,7 @@ impl BevyPlugin for Plugin {
             .init_resource::<BirdEye>()
             .add_system_set(SystemSet::on_exit(self.0).with_system(cleanup))
             .add_system(use_seed)
+            .add_system(follow_sleeve)
             .add_system(control_bird_pupil)
             .add_system(execute_cheat);
     }
