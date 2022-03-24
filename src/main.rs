@@ -1,3 +1,10 @@
+//! Warlock's gambit.
+//!
+//! # Architecture
+//!
+//! The most important module is probably [`game_flow`] where the game logic is
+//! defined. Other modules are mostly helpers for input and ai. [See module
+//! section](#Modules).
 use bevy::prelude::*;
 
 mod animate;
@@ -17,13 +24,6 @@ mod ui;
 mod war;
 
 use state::{GameState, TurnState};
-
-mod camera {
-    use bevy::prelude::Component;
-
-    #[derive(Component)]
-    pub struct PlayerCam;
-}
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Participant {
@@ -69,7 +69,12 @@ fn main() {
         .add_plugins(DefaultPlugins);
 
     #[cfg(feature = "debug")]
-    app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new());
+    app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new())
+        .add_plugin(bevy::pbr::wireframe::WireframePlugin)
+        .insert_resource(bevy::render::options::WgpuOptions {
+            features: bevy::render::render_resource::WgpuFeatures::POLYGON_MODE_LINE,
+            ..Default::default()
+        });
 
     app.insert_resource(ClearColor(Color::rgb(0.293, 0.3828, 0.4023)))
         .init_resource::<GameStarts>()

@@ -4,10 +4,10 @@
 //! # Architecture
 //!
 //! This module does:
-//! * Manage game state transitions (see [#Transitions] section).
+//! * Manage game state transitions (see [Transitions](#Transitions) section).
 //! * Compute points obtained in a turn and distribute cards from the war pile
 //!   into their corresponding piles in accordance to the game rules, see
-//!   [#Scores] section.
+//!   [Scores](#Scores) section.
 //!   * This includes keeping track of the effects active for this turn.
 //!   * This includes providing an API to let other modules access the party
 //!     scores, and therefore keeping track of the points.
@@ -275,7 +275,8 @@ type HandFilter = (With<CardOrigin>, Without<PileCard>, Without<SleeveCard>);
 /// through its methods.
 #[derive(SystemParam)]
 pub struct CardStats<'w, 's> {
-    piles: Query<'w, 's, (&'static PileCard, &'static Card)>,
+    cards: Query<'w, 's, &'static Card>,
+    piles: Query<'w, 's, &'static Pile>,
     hands: Query<'w, 's, &'static Card, HandFilter>,
     sleeve: Query<'w, 's, &'static Card, With<SleeveCard>>,
     player_deck: Query<'w, 's, &'static PlayerDeck>,
@@ -290,23 +291,18 @@ impl<'w, 's> CardStats<'w, 's> {
         let oppo_score = self.oppo_deck.single().score();
         player_score + oppo_score + sleeve_score + hands_score
     }
+    fn score(&self, pile: PileType) -> i32 {
+        let card = |e: &Entity| self.cards.get(*e).ok();
+        let value = |c: &Card| c.value as i32;
+        let pile = |p: &&Pile| p.which == pile;
+        let pile = self.piles.iter().find(pile).unwrap();
+        pile.cards().iter().filter_map(card).map(value).sum()
+    }
     pub fn player_score(&self) -> i32 {
-        use PileType::Player;
-        let player_score: i32 = self
-            .piles
-            .iter()
-            .filter_map(|(p, c)| matches!(p.which, Player).then(|| c.value as i32))
-            .sum();
-        player_score + self.score_bonuses.player
+        self.score(PileType::Player) + self.score_bonuses.player
     }
     pub fn oppo_score(&self) -> i32 {
-        use PileType::Oppo;
-        let oppo_score: i32 = self
-            .piles
-            .iter()
-            .filter_map(|(p, c)| matches!(p.which, Oppo).then(|| c.value as i32))
-            .sum();
-        oppo_score + self.score_bonuses.oppo
+        self.score(PileType::Oppo) + self.score_bonuses.oppo
     }
 }
 

@@ -1,9 +1,47 @@
-//! Defines the rules of war
+//! Defines the rules of war. Exactly, how a turn resolves (rather than how it
+//! flows, see [`crate::game_flow`] for that).
+//!
+//! The module defines how to parse a [`Card`] definition from text, this is to
+//! make it possible to load decks from file.
+//!
+//! # Rules
+//!
+//! * The card with the highest score wins except:
+//!   * Zero beats Nine
+//!   * the `Zihbm` reverses the outcome of the turn (including Zero/Nine
+//!     interaction)
+//! * The winner gets the two card, and their face value count toward their
+//!   score.
+//! * If the two cards have the same value, each player get back their card,
+//!   gaining the same score.
+//!
+//! ## Effects
+//!
+//! Cards have optional effects, called [`WordOfPower`]s. The effects are
+//! listed in the enum definition.
+use std::str::FromStr;
 
 use bevy::prelude::{Color, Component};
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::Inspectable;
 use enum_map::Enum;
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum ParseError {
+    BadValue(String),
+    BadWord(String),
+    EmptyWord,
+}
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseError::EmptyWord => write!(f, "The word is specified as non-existing"),
+            ParseError::BadWord(word) => write!(f, "The word {word} is invalid"),
+            ParseError::BadValue(value) => write!(f, "The value {value} is invalid"),
+        }
+    }
+}
+impl std::error::Error for ParseError {}
 
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub enum BattleOutcome {
@@ -12,6 +50,7 @@ pub enum BattleOutcome {
     Win,
 }
 
+/// Card point value.
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value {
@@ -48,6 +87,19 @@ impl Value {
 
             (Nine,  Zero) => Loss,
             (Five | Six | Seven | Eight | Nine, _) => Win,
+        }
+    }
+}
+impl FromStr for Value {
+    type Err = ParseError;
+    #[rustfmt::skip]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use Value::*;
+        match s {
+            "0" => Ok(Zero),  "1" => Ok(One),   "2" => Ok(Two),
+            "3" => Ok(Three), "4" => Ok(Four),  "5" => Ok(Five),
+            "6" => Ok(Six),   "7" => Ok(Seven), "8" => Ok(Eight),
+            "9" => Ok(Nine),  _ => Err(ParseError::BadValue(s.to_owned())),
         }
     }
 }
@@ -93,6 +145,20 @@ impl WordOfPower {
         }
     }
 }
+impl FromStr for WordOfPower {
+    type Err = ParseError;
+    #[rustfmt::skip]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use WordOfPower::*;
+        match s {
+            "seed" | "s" => Ok(Egeq),  "doub" | "d" => Ok(Qube),
+            "swap" | "w" => Ok(Zihbm), "zero" | "z" => Ok(Geh),
+            "____" | "_" => Err(ParseError::EmptyWord),
+            "het" => Ok(Het), "meb" => Ok(Meb),
+            _ => Err(ParseError::BadWord(s.to_owned())),
+        }
+    }
+}
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component, Clone, Debug)]
@@ -123,6 +189,18 @@ impl Default for Card {
         Self { word: None, value: Value::Zero }
     }
 }
+impl FromStr for Card {
+    type Err = ParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use ParseError::EmptyWord;
+        let (value, word) = s.split_at(1);
+        let word = word.parse().map_or_else(
+            |err| if matches!(err, EmptyWord) { Ok(None) } else { Err(err) },
+            |word| Ok(Some(word)),
+        );
+        Ok(Card { value: value.parse()?, word: word? })
+    }
+}
 impl Card {
     pub fn beats(&self, other: &Self) -> BattleOutcome {
         use BattleOutcome::{Loss, Tie, Win};
@@ -133,9 +211,6 @@ impl Card {
             (Loss, true) | (Win, false) => Win,
             (Tie, _) => Tie,
         }
-    }
-    pub fn new(word: Option<WordOfPower>, value: Value) -> Self {
-        Self { word, value }
     }
     pub fn max_value(&self) -> i32 {
         let value = self.value as i32;
@@ -167,38 +242,22 @@ mod tests {
     use super::*;
 
     macro_rules! bonus_for {
-        (@card $value:tt $word:tt) => (
-             Card::new(bonus_for!(@word $word), bonus_for!(@val $value))
-        );
-        (@val 0) => (Value::Zero);
-        (@val 1) => (Value::One);
-        (@val 2) => (Value::Two);
-        (@val 3) => (Value::Three);
-        (@val 4) => (Value::Four);
-        (@val 5) => (Value::Five);
-        (@val 6) => (Value::Six);
-        (@val 7) => (Value::Seven);
-        (@val 8) => (Value::Eight);
-        (@val 9) => (Value::Nine);
-        (@word _) => (None);
-        (@word s) => (Some(WordOfPower::Egeq)); // Seed
-        (@word d) => (Some(WordOfPower::Qube)); // Double
-        (@word w) => (Some(WordOfPower::Zihbm)); // Swap
-        (@word z) => (Some(WordOfPower::Geh)); // 0 -> 12
-        ($lval:tt $lword:tt , $rval:tt $rword:tt) => (
-            bonus_for!(@card $lval $lword).bonus_points(&bonus_for!(@card $rval $rword))
-        );
+        ($lcard:tt, $rcard:tt) => {{
+            let lcard: Card = stringify!($lcard).parse().unwrap();
+            let rcard: Card = stringify!($rcard).parse().unwrap();
+            lcard.bonus_points(&rcard)
+        }};
     }
     #[test]
     fn bonus_point_test() {
-        assert_eq!((0, 0), bonus_for!(9 _, 9 _));
-        assert_eq!((12, 0), bonus_for!(0 z, 9 _));
-        assert_eq!((12, 0), bonus_for!(0 _, 9 z));
-        assert_eq!((24, 0), bonus_for!(0 z, 9 z));
-        assert_eq!((24, 9), bonus_for!(0 z, 9 d));
-        assert_eq!((24, 9), bonus_for!(0 d, 9 z));
-        assert_eq!((0, 2), bonus_for!(0 d, 1 d));
-        assert_eq!((1, 1), bonus_for!(1 d, 1 _));
-        assert_eq!((2, 2), bonus_for!(1 d, 1 d));
+        assert_eq!((0, 0), bonus_for!(9_, 9_));
+        assert_eq!((12, 0), bonus_for!(0z, 9_));
+        assert_eq!((12, 0), bonus_for!(0_, 9z));
+        assert_eq!((24, 0), bonus_for!(0z, 9z));
+        assert_eq!((24, 9), bonus_for!(0z, 9d));
+        assert_eq!((24, 9), bonus_for!(0d, 9z));
+        assert_eq!((0, 2), bonus_for!(0d, 1d));
+        assert_eq!((1, 1), bonus_for!(1d, 1_));
+        assert_eq!((2, 2), bonus_for!(1d, 1d));
     }
 }

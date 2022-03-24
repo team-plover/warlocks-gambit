@@ -1,7 +1,7 @@
 use bevy::math::Vec3Swizzles;
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_ui_build_macros::{rect, size, style, unit};
-use bevy_ui_navigation::{systems as nav, Focused, NavigationPlugin};
+use bevy_ui_navigation::{systems as nav, Focused, NavRequestSystem, NavigationPlugin};
 
 #[derive(Clone, Component, Default)]
 pub struct MenuCursor {
@@ -93,8 +93,8 @@ impl BevyPlugin for Plugin {
         app.add_plugin(NavigationPlugin)
             .init_resource::<UiAssets>()
             .init_resource::<nav::InputMapping>()
-            .add_system(nav::default_mouse_input)
-            .add_system(update_highlight);
+            .add_system(nav::default_mouse_input.before(NavRequestSystem))
+            .add_system_to_stage(CoreStage::PostUpdate, update_highlight);
 
         app.add_startup_system(|mut cmds: Commands| {
             cmds.spawn_bundle(UiCameraBundle::default());

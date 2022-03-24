@@ -3,7 +3,7 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy::{app::AppExit, input::mouse::MouseMotion, window::WindowMode};
 use bevy_debug_text_overlay::screen_print;
 use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
-use bevy_ui_navigation::{Focusable, Focused, NavEvent, NavRequest};
+use bevy_ui_navigation::{Focusable, Focused, NavEvent, NavRequest, NavRequestSystem};
 
 use crate::{
     audio::{AudioChannel, AudioRequest, SfxParam},
@@ -246,7 +246,7 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
             ],
             node{ flex_direction: FD::Row }[; Name::new("Menu columns")](
                 node[; Name::new("Menu node")](
-                    node[large_text("Start");   focusable, Name::new("Start button"), Start],
+                    node[large_text("Start"); Focusable::new().dormant(), Name::new("Start button"), Start],
                     node[large_text("Credits"); Focusable::lock(), Name::new("Credits button"), Credits],
                     if (!cfg!(target_arch = "wasm32")) {
                         node[large_text("Exit"); focusable, Name::new("Exit button"), Exit]
@@ -298,9 +298,9 @@ impl BevyPlugin for Plugin {
             .add_system_set(self.0.on_exit(cleanup_marked::<MainMenuRoot>))
             .add_system_set(
                 SystemSet::on_update(self.0)
-                    .with_system(update_sliders)
-                    .with_system(leave_credits)
-                    .with_system(update_menu),
+                    .with_system(update_sliders.before(NavRequestSystem))
+                    .with_system(leave_credits.before(NavRequestSystem))
+                    .with_system(update_menu.after(NavRequestSystem)),
             );
     }
 }

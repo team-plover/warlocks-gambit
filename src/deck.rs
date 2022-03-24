@@ -1,16 +1,45 @@
-use bevy::prelude::{Plugin as BevyPlugin, *};
+//! The game deck, deck loading from files and drawing cards from deck.
+//!
+//! We define a custom [`Deck`] asset with a custom loader [`DeckLoader`], this
+//! way it is possible for the player to change the decks defined in
+//! `assets/decks/*.deck`, and it is also possible to hot-reload the decks for
+//! quicker iteration time.
+use std::str::FromStr;
+
+use bevy::{
+    asset::{AssetLoader, LoadContext, LoadedAsset},
+    prelude::{Plugin as BevyPlugin, *},
+    reflect::TypeUuid,
+    utils::BoxedFuture,
+};
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
-use bevy_scene_hook::SceneHook;
+use bevy_scene_hook::world::SceneHook;
 
 use crate::{
     scene::Scene,
     state::GameState,
-    war::{Card, Value, WordOfPower},
+    war::{Card, ParseError},
 };
 
+pub struct DeckAssets {
+    pub player: Handle<Deck>,
+    pub oppo: Handle<Deck>,
+}
+impl FromWorld for DeckAssets {
+    fn from_world(world: &mut World) -> Self {
+        let assets = world.get_resource::<AssetServer>().unwrap();
+        Self {
+            player: assets.load("decks/player.deck"),
+            oppo: assets.load("decks/oppo.deck"),
+        }
+    }
+}
+
 #[cfg_attr(feature = "debug", derive(Inspectable))]
-struct Deck {
+#[derive(Debug, TypeUuid, Clone)]
+#[uuid = "010293ef-dc29-4d94-aae1-39da45947644"]
+pub struct Deck {
     cards: Vec<Card>,
 }
 impl Deck {
@@ -30,6 +59,34 @@ impl Deck {
         self.cards.iter().map(Card::max_value).sum()
     }
 }
+impl FromStr for Deck {
+    type Err = ParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let deck = s
+            .split_ascii_whitespace()
+            .map(|s| s.parse())
+            .collect::<Result<_, _>>()?;
+        Ok(Self::new(deck))
+    }
+}
+#[derive(Default)]
+pub struct DeckLoader;
+impl AssetLoader for DeckLoader {
+    fn load<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        load_context: &'a mut LoadContext,
+    ) -> BoxedFuture<'a, Result<(), anyhow::Error>> {
+        Box::pin(async move {
+            let deck: Deck = std::str::from_utf8(bytes)?.parse()?;
+            load_context.set_default_asset(LoadedAsset::new(deck));
+            Ok(())
+        })
+    }
+    fn extensions(&self) -> &[&str] {
+        &["deck"]
+    }
+}
 
 macro_rules! impl_deck_methods {
     ($what:ident) => (
@@ -37,6 +94,15 @@ macro_rules! impl_deck_methods {
             impl_deck_methods!(@method score((&)) -> i32);
             impl_deck_methods!(@method draw((&mut), count: usize) -> Vec<Card>);
             impl_deck_methods!(@method remaining((&)) -> usize);
+            pub fn new(deck: Deck) -> Self {
+                Self(deck)
+            }
+            pub fn reset(&mut self, handle: &Handle<Deck>, decks: &Assets<Deck>) {
+                self.0 = decks
+                    .get(handle.clone())
+                    .expect("Deck already loaded")
+                    .clone();
+            }
         }
     );
     (@method $name:ident (
@@ -59,55 +125,6 @@ impl_deck_methods!(PlayerDeck);
 #[derive(Component)]
 pub struct OppoDeck(Deck);
 impl_deck_methods!(OppoDeck);
-
-macro_rules! cards {
-    ($($value:tt $word:tt |)*) => (
-        Deck::new(vec![ $( Card::new(cards!(@word $word), cards!(@val $value)) ,)* ])
-    );
-    (@val 0) => (Value::Zero);
-    (@val 1) => (Value::One);
-    (@val 2) => (Value::Two);
-    (@val 3) => (Value::Three);
-    (@val 4) => (Value::Four);
-    (@val 5) => (Value::Five);
-    (@val 6) => (Value::Six);
-    (@val 7) => (Value::Seven);
-    (@val 8) => (Value::Eight);
-    (@val 9) => (Value::Nine);
-    (@word _) => (None);
-    (@word s) => (Some(WordOfPower::Egeq)); // Seed
-    (@word d) => (Some(WordOfPower::Qube)); // Double
-    (@word w) => (Some(WordOfPower::Zihbm)); // Swap
-    (@word z) => (Some(WordOfPower::Geh)); // 0 -> 12
-}
-
-impl PlayerDeck {
-    #[rustfmt::skip]
-    pub fn new() -> Self {
-        Self(cards![
-            7 s | 0 _ | 1 s |
-            4 _ | 2 _ | 6 d |
-            6 s | 8 w | 0 z |
-            2 s | 3 _ | 4 _ |
-            3 _ | 9 z | 1 d |
-            5 w | 4 _ | 3 _ |
-        ])
-    }
-}
-
-impl OppoDeck {
-    #[rustfmt::skip]
-    pub fn new() -> Self {
-        Self(cards![
-            8 _ | 7 _ | 6 _ |
-            9 z | 5 d | 6 _ |
-            8 _ | 9 _ | 6 _ |
-            7 _ | 1 w | 5 _ |
-            9 d | 0 w | 5 _ |
-            1 d | 6 d | 5 _ |
-        ])
-    }
-}
 
 fn update_meshes(
     (player_cards, oppo_cards): (usize, usize),
@@ -157,9 +174,14 @@ fn resize_decks(
     );
 }
 
-fn reset_decks(mut player: Query<&mut PlayerDeck>, mut oppo: Query<&mut OppoDeck>) {
-    *player.single_mut() = PlayerDeck::new();
-    *oppo.single_mut() = OppoDeck::new();
+fn reset_decks(
+    mut player: Query<&mut PlayerDeck>,
+    mut oppo: Query<&mut OppoDeck>,
+    decks: Res<Assets<Deck>>,
+    deck_handles: Res<DeckAssets>,
+) {
+    player.single_mut().reset(&deck_handles.player, &decks);
+    oppo.single_mut().reset(&deck_handles.oppo, &decks);
 }
 
 pub struct Plugin(pub GameState);
@@ -170,7 +192,10 @@ impl BevyPlugin for Plugin {
         app.register_inspectable::<PlayerDeck>()
             .register_inspectable::<OppoDeck>();
 
-        app.add_system(resize_decks.with_run_criteria(Scene::when_spawned))
+        app.add_asset::<Deck>()
+            .init_asset_loader::<DeckLoader>()
+            .init_resource::<DeckAssets>()
+            .add_system(resize_decks.with_run_criteria(Scene::when_spawned))
             .add_system_set(self.0.on_exit(reset_decks));
     }
 }

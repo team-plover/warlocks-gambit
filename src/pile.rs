@@ -1,3 +1,5 @@
+//! Hotspot for depositing cards: the war pile, and the place where cards go
+//! after a battle.
 use bevy::prelude::{Plugin as BevyPlugin, *};
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
@@ -42,6 +44,9 @@ impl Pile {
     }
     pub fn new(which: PileType) -> Self {
         Self { which, stack: Vec::new() }
+    }
+    pub fn cards(&self) -> &[Entity] {
+        &self.stack
     }
 }
 

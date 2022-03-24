@@ -7,7 +7,7 @@ set -e
 
 OutDir=target/wasm_package
 
-HttpServerAddress=0.0.0.0
+HttpServerAddress=127.0.0.1
 HttpServerPort=8000
 
 if [ ! -e .git ]; then
@@ -86,6 +86,7 @@ mv $OutDir/*.js "$OutDir/main.js"
 if [ "$1" = "--run" ]; then
 	python3 -m http.server --bind $HttpServerAddress --directory "$OutDir" $HttpServerPort &
 	Job=$!
-	chromium $HttpServerAddress:$HttpServerPort/index.html
+    Browser=${BROWSER:-chromium}
+	$Browser http://$HttpServerAddress:$HttpServerPort/index.html
 	kill $Job
 fi

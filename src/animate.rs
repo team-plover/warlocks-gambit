@@ -1,3 +1,4 @@
+//! Animations.
 use std::f64::consts::PI;
 
 use bevy::prelude::{Plugin as BevyPlugin, *};
@@ -7,26 +8,23 @@ use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 #[derive(Component)]
 pub struct DisableAnimation;
 
+/// Modify the transform of entities it's attached to.
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component)]
 pub enum Animated {
-    /// Change `scale` to give a feeling of breathing
+    /// Change `scale` to give a feeling of breathing.
     Breath {
         offset: f64,
         strength: f32,
         period: f64,
     },
-    /// Bob up and down, offset by `f32` seconds
+    /// Bob up and down, offset by `f32` seconds.
     Bob {
         offset: f64,
         strength: f32,
         period: f64,
     },
-    MoveInto {
-        target: Transform,
-        speed: f32,
-    },
-    /// Go in a cirlce on provided axis
+    /// Go in a cirlce on provided axis.
     Circle {
         offset: f64,
         radius: f32,
@@ -67,15 +65,10 @@ fn reset_static(
 
 fn run_animation(
     time: Res<Time>,
-    mut cmds: Commands,
-    mut animated: Query<
-        (Entity, &mut Transform, &InitialTransform, &Animated),
-        Without<DisableAnimation>,
-    >,
+    mut animated: Query<(&mut Transform, &InitialTransform, &Animated), Without<DisableAnimation>>,
 ) {
-    let delta = time.delta_seconds();
     let time = time.seconds_since_startup();
-    for (entity, mut trans, init, anim) in animated.iter_mut() {
+    for (mut trans, init, anim) in animated.iter_mut() {
         match *anim {
             Animated::Static => {}
             Animated::Bob { offset, strength, period } => {
@@ -99,18 +92,6 @@ fn run_animation(
                 let anim_offset = ((time + offset) % period / period * PI * 2.0) as f32;
                 let trans_offset = Vec3::new(anim_offset.sin(), anim_offset.cos(), 0.0) * radius;
                 trans.translation = init.0.translation + trans_offset;
-            }
-            Animated::MoveInto { target, speed } => {
-                let (cur_pos, cur_rot) = (trans.translation, trans.rotation);
-                let (target_pos, target_rot) = (target.translation, target.rotation);
-                let pos_diff = cur_pos.distance_squared(target_pos);
-                let rot_diff = cur_rot.angle_between(target_rot);
-                if pos_diff < 0.01 && rot_diff < 0.005 {
-                    cmds.entity(entity).remove::<Animated>();
-                } else {
-                    trans.translation = cur_pos.lerp(target_pos, speed * delta);
-                    trans.rotation = cur_rot.lerp(target_rot, speed * delta);
-                }
             }
         }
     }

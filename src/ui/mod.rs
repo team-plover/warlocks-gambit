@@ -1,3 +1,4 @@
+//! Menu and gameover screen ui.
 mod common;
 mod main_menu;
 mod restart_menu;
