@@ -95,7 +95,7 @@ use crate::{
     audio::AudioRequest,
     cheat::SleeveCard,
     deck::{OppoDeck, PlayerDeck},
-    game_ui::EffectEvent,
+    game_ui::{EffectEvent, ScoreEvent},
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
     war::{BattleOutcome, Card, WordOfPower::Egeq},
@@ -220,12 +220,13 @@ fn handle_turn_end(
     mut piles: Query<&mut Pile>,
     mut cmds: Commands,
     mut score_bonuses: ResMut<ScoreBonuses>,
+    mut score_update: EventWriter<ScoreEvent>,
 ) {
     use Participant::{Oppo, Player};
 
     let war_pile: Vec<_> = played_cards.iter().collect();
 
-    let mut add_card_to_pile = |entity, bonus, who: Participant| {
+    let mut add_card_to_pile = |entity, card: &Card, bonus, who: Participant| {
         let is_war = |p: &Mut<Pile>| p.which == PileType::War;
         let is_who = |p: &Mut<Pile>| p.which == who.into();
 
@@ -234,6 +235,7 @@ fn handle_turn_end(
             .insert(pile.add_existing(entity))
             .remove::<PlayedCard>();
         piles.iter_mut().find(is_war).unwrap().remove(entity);
+        score_update.send(ScoreEvent::Add(who, bonus + card.value as i32));
         score_bonuses.add_to_owner(who, bonus);
     };
     match war_pile[..] {
@@ -244,16 +246,16 @@ fn handle_turn_end(
             screen_print!(sec: 2, "player: {player_bonus}, oppo: {oppo_bonus}");
             match player.1.beats(oppo.1) {
                 BattleOutcome::Tie => {
-                    add_card_to_pile(player.2, player_bonus, Player);
-                    add_card_to_pile(oppo.2, oppo_bonus, Oppo);
+                    add_card_to_pile(player.2, player.1, player_bonus, Player);
+                    add_card_to_pile(oppo.2, oppo.1, oppo_bonus, Oppo);
                 }
                 BattleOutcome::Loss => {
-                    add_card_to_pile(player.2, player_bonus, Oppo);
-                    add_card_to_pile(oppo.2, oppo_bonus, Oppo);
+                    add_card_to_pile(player.2, player.1, player_bonus, Oppo);
+                    add_card_to_pile(oppo.2, oppo.1, oppo_bonus, Oppo);
                 }
                 BattleOutcome::Win => {
-                    add_card_to_pile(player.2, player_bonus, Player);
-                    add_card_to_pile(oppo.2, oppo_bonus, Player);
+                    add_card_to_pile(player.2, player.1, player_bonus, Player);
+                    add_card_to_pile(oppo.2, oppo.1, oppo_bonus, Player);
                 }
             }
         }

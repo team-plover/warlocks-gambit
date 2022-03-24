@@ -8,12 +8,20 @@ use enum_map::{enum_map, EnumMap};
 
 use crate::{
     game_flow::{CardStats, SeedCount},
+    numbers::Number,
     state::GameState,
     war::WordOfPower,
+    Participant,
 };
 
 #[derive(Component, Clone)]
 struct UiRoot;
+
+#[derive(Component)]
+pub struct PlayerScore;
+
+#[derive(Component)]
+pub struct OppoScore;
 
 #[derive(Component, Clone)]
 struct CardEffectDescription;
@@ -21,13 +29,12 @@ struct CardEffectDescription;
 #[derive(Component, Clone)]
 struct CardEffectImage;
 
+pub enum ScoreEvent {
+    Add(Participant, i32),
+}
 #[derive(Component, Clone)]
 enum UiInfo {
     Seeds,
-    // Playing,
-    PlayerScore,
-    OppoScore,
-    // CardsLeft,
 }
 
 struct UiAssets {
@@ -93,22 +100,6 @@ fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
                     node[text("Seeds: ");],
                     node[text("0"); UiInfo::Seeds]
                 ),
-                // node[; Name::new("Playing")](
-                //     node[text("Turn: ");],
-                //     node[text("Player"); UiInfo::Playing]
-                // ),
-                node[; Name::new("Player score")](
-                    node[text("Player: ");],
-                    node[text("0"); UiInfo::PlayerScore]
-                ),
-                node[; Name::new("Oppo score")](
-                    node[text("Oppo: ");],
-                    node[text("0"); UiInfo::OppoScore]
-                )
-                // node[; Name::new("Cards remaining")](
-                //     node[text("Cards remaining: ");],
-                //     node[text("60"); UiInfo::CardsLeft]
-                // )
             )
         )
     };
@@ -210,16 +201,31 @@ fn handle_effect_events(
     }
 }
 
+fn update_score(
+    mut player_score: Query<&mut Number, With<PlayerScore>>,
+    mut oppo_score: Query<&mut Number, (With<OppoScore>, Without<PlayerScore>)>,
+    mut events: EventReader<ScoreEvent>,
+) {
+    for ScoreEvent::Add(participant, additional) in events.iter() {
+        match *participant {
+            Participant::Oppo => {
+                let mut oppo_score = oppo_score.single_mut();
+                oppo_score.value += *additional;
+            }
+            Participant::Player => {
+                let mut player_score = player_score.single_mut();
+                player_score.value += *additional;
+            }
+        }
+    }
+}
+
 fn update_game_ui(
     mut ui_infos: Query<(&mut Text, &UiInfo)>,
-    // turn_state: Res<State<TurnState>>,
     player_seeds: Res<SeedCount>,
     stats: CardStats,
 ) {
     screen_print!("values left: {}", stats.remaining_score());
-    let player_score = stats.player_score();
-    let oppo_score = stats.oppo_score();
-    // let total_cards = stats.cards_remaining();
     for (mut text, ui_info) in ui_infos.iter_mut() {
         let txt = &mut text.sections[0].value;
         txt.clear();
@@ -228,18 +234,6 @@ fn update_game_ui(
                 let seeds = player_seeds.count();
                 write!(txt, "{seeds}").unwrap();
             }
-            // UiInfo::Playing => {
-            //     let turn = turn_state.current();
-            //     write!(txt, "{turn:?}").unwrap();
-            // }
-            UiInfo::OppoScore => {
-                write!(txt, "{oppo_score}").unwrap();
-            }
-            UiInfo::PlayerScore => {
-                write!(txt, "{player_score}").unwrap();
-            } // UiInfo::CardsLeft => {
-              //     write!(txt, "{total_cards}").unwrap();
-              // }
         }
     }
 }
@@ -249,12 +243,14 @@ impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<UiAssets>()
             .add_event::<EffectEvent>()
+            .add_event::<ScoreEvent>()
             .init_resource::<EffectDisplay>()
             .add_system_set(SystemSet::on_enter(self.0).with_system(spawn_game_ui))
             .add_system(hide_effects)
             .add_system_set(
                 SystemSet::on_update(self.0)
                     .with_system(update_game_ui)
+                    .with_system(update_score)
                     .with_system(handle_effect_events),
             )
             .add_system_set(SystemSet::on_exit(self.0).with_system(despawn_game_ui));
