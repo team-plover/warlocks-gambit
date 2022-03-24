@@ -1,3 +1,10 @@
+//! Warlock's gambit.
+//!
+//! # Architecture
+//!
+//! The most important module is probably [`game_flow`] where the game logic is
+//! defined. Other modules are mostly helpers for input and ai. [See module
+//! section](#Modules).
 use bevy::prelude::*;
 
 mod animate;

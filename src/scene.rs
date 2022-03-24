@@ -1,3 +1,5 @@
+//! Load the game scene and add `Component`s from all modules to entities named
+//! in the scene.
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_mod_raycast::RayCastSource;
 use bevy_scene_hook::{world::SceneHook as WorldSceneHook, SceneInstance};

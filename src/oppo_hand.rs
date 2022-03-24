@@ -1,3 +1,11 @@
+//! Enemy AI.
+//!
+//! Select card to play based on which one has been played (if any) and play
+//! them.
+//!
+//! * [`update_oppo_hand`]: Move cards in the hand of the opposition.
+//! * [`play_card`]: system running AI to and play card it selected.
+//! * [`chose_card`]: AI heuristic to select card to play.
 use bevy::prelude::{Plugin as BevyPlugin, *};
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
@@ -74,14 +82,6 @@ fn play_card(
     card_events.send(PlayCard::new(selected, Participant::Oppo));
 }
 
-fn index_of<T: PartialEq>(t: &T, slice: &[T]) -> usize {
-    slice
-        .iter()
-        .enumerate()
-        .find_map(|(i, elem)| (elem == t).then(|| i))
-        .unwrap()
-}
-
 /// Chose from cards in hand which one to play.
 fn chose_card(played: Option<&Card>, in_hand: &[Card]) -> usize {
     // TODO: replace all logic by simple call to Card::bonus_points
@@ -105,8 +105,9 @@ fn chose_card(played: Option<&Card>, in_hand: &[Card]) -> usize {
     let a_tie = || in_hand.iter().find(|this| this.beats(played) == Tie);
     let winning = in_hand.iter().filter(wins).min();
 
+    // unwrap: we know we have at least one card (asserted in `play_card`)
     let chosen = winning.or_else(a_tie).or_else(lowest_value).unwrap();
-    index_of(chosen, in_hand)
+    in_hand.iter().position(|e| e == chosen).unwrap()
 }
 
 pub struct Plugin(pub GameState);

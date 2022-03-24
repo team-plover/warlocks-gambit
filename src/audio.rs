@@ -1,3 +1,7 @@
+//! Play music and sound effects.
+//!
+//! Defines an [`AudioRequest`] event, reads them in [`play_audio`] system
+//! using the kira backend for mixing and loudness controls.
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_kira_audio::{Audio, AudioChannel as KiraChannel, AudioPlugin, AudioSource};
 use enum_map::{enum_map, EnumMap};

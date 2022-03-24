@@ -1,4 +1,24 @@
-//! Defines the rules of war
+//! Defines the rules of war. Exactly, how a turn resolves (rather than how it
+//! flows, see [`crate::game_flow`] for that).
+//!
+//! The module defines how to parse a [`Card`] definition from text, this is to
+//! make it possible to load decks from file.
+//!
+//! # Rules
+//!
+//! * The card with the highest score wins except:
+//!   * Zero beats Nine
+//!   * the `Zihbm` reverses the outcome of the turn (including Zero/Nine
+//!     interaction)
+//! * The winner gets the two card, and their face value count toward their
+//!   score.
+//! * If the two cards have the same value, each player get back their card,
+//!   gaining the same score.
+//!
+//! ## Effects
+//!
+//! Cards have optional effects, called [`WordOfPower`]s. The effects are
+//! listed in the enum definition.
 use std::str::FromStr;
 
 use bevy::prelude::{Color, Component};
@@ -30,6 +50,7 @@ pub enum BattleOutcome {
     Win,
 }
 
+/// Card point value.
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value {

@@ -4,10 +4,10 @@
 //! # Architecture
 //!
 //! This module does:
-//! * Manage game state transitions (see [#Transitions] section).
+//! * Manage game state transitions (see [Transitions](#Transitions) section).
 //! * Compute points obtained in a turn and distribute cards from the war pile
 //!   into their corresponding piles in accordance to the game rules, see
-//!   [#Scores] section.
+//!   [Scores](#Scores) section.
 //!   * This includes keeping track of the effects active for this turn.
 //!   * This includes providing an API to let other modules access the party
 //!     scores, and therefore keeping track of the points.

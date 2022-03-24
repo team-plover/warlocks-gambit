@@ -1,3 +1,10 @@
+//! Handle the visual elements of cards.
+//!
+//! Exposes the [`SpawnCard`] system parameter to spawn cards with all
+//! proper graphical objects attached to it. [`SpawnCard`] uses assets defined
+//! in [`CardAssets`].
+//!
+//! The only system here is [`update_card_graphics`].
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use bevy::ecs::system::{EntityCommands, SystemParam};
@@ -59,6 +66,7 @@ const CARD_EDGES: [u16; 30] = [
     9, 0, 11,
 ];
 
+/// Spawn a card with all the proper associated graphics.
 #[derive(SystemParam)]
 pub struct SpawnCard<'w, 's> {
     pub cmds: Commands<'w, 's>,

@@ -1,3 +1,11 @@
+//! Let the player put cards in his sleeve, and control when they are spotted
+//! and distracting the watchers.
+//!
+//! Mostly responsible for moving into the sleeve, moving the bird eye.
+//!
+//! But it also defines the [`CheatEvent`] events, they are read in the
+//! [`execute_cheat`] system, it controls the game over condition when player
+//! forgot to distract the bird before cheating.
 use bevy::input::keyboard::KeyCode;
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_debug_text_overlay::screen_print;

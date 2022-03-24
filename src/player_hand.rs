@@ -1,3 +1,17 @@
+//! Player interaction with cards in hand.
+//!
+//! Handle mouse pointer interactions, grabbing cards and slipping them into
+//! the sleeves.
+//!
+//! It uses the `bevy_mod_raycast` crate to handle pointer stuff. It specifies
+//! a mesh for each card in player [`HandRaycast`], a mesh for the area in
+//! which dropping a dragged card will "cancel" the card selection
+//! [`HandDisengageArea`] and an area where you can drop grabbed cards in the
+//! sleeve [`SleeveArea`].
+//!
+//! * [`DrawParams`] defines how to spawn a card with all the collision meshes
+//!   setup.
+//! * [`CardCollisionAssets`] defines the meshes used for collision detection.
 use std::f32::consts::FRAC_PI_4;
 
 use bevy::{
@@ -24,10 +38,12 @@ use crate::{
 #[derive(Component)]
 pub struct PlayerHand;
 
+/// Mark the card that the player is currently dragging. Used in [`crate::cheat`] for
+/// the bird eye tracking player card.
 #[derive(Component)]
 pub struct GrabbedCard;
 
-/// Mesh for selecting the card
+/// Mesh for selecting the card.
 pub enum HandRaycast {}
 
 /// Marks the mesh that represents where if we disengage the card (relese the
@@ -50,7 +66,8 @@ impl HandCard {
     }
 }
 
-struct CardCollisionAssets {
+/// Meshes used for collision detection.
+pub struct CardCollisionAssets {
     bounding_box: Handle<Mesh>,
     underlay: Handle<Mesh>,
 }
@@ -70,6 +87,7 @@ impl FromWorld for CardCollisionAssets {
 #[derive(Component)]
 struct Underlay;
 
+/// System parameter to spawn a card with all the collision meshes setup.
 #[derive(SystemParam)]
 struct DrawParams<'w, 's> {
     card_spawner: SpawnCard<'w, 's>,
@@ -112,6 +130,7 @@ impl<'w, 's> DrawParams<'w, 's> {
     }
 }
 
+/// Draw cards to full hand (managing sleeved ones) and
 #[allow(clippy::type_complexity)]
 fn draw_hand(
     mut card_drawer: DrawParams,
@@ -129,6 +148,8 @@ fn draw_hand(
     }
 }
 
+/// Update the `bevy_mod_raycast` `RayCastSource` each frame so that it tracks
+/// the cursor position.
 fn update_raycast(
     mut query: Query<&mut RayCastSource<HandRaycast>>,
     mut cursor: EventReader<CursorMoved>,
@@ -171,11 +192,13 @@ fn hover_card(
     }
 }
 
+// TODO: remove this, move the sleeve logic from play_card to update_sleeve
 enum HandEvent {
     RaiseSleeve,
     LowerSleeve,
 }
 
+/// Handle player interaction with cards in hand.
 fn play_card(
     mouse: Res<Input<MouseButton>>,
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
@@ -242,6 +265,8 @@ fn play_card(
 // TODO: tilt hand backward when enemy is playing so that it's more explicitly
 // the player's turn
 // TODO: animate sleeve movement
+/// Move sleeve up/down based on whether the player is currently dragging over
+/// the sleeve hot zone.
 fn update_sleeve(
     mut cmds: Commands,
     mut hand: Query<(Entity, &mut Transform), With<PlayerHand>>,
@@ -280,9 +305,8 @@ type HoverQuery = (
     &'static CardStatus,
     &'static HandCard,
 );
-/// Animate card movements into the player hand
-///
-/// (skip card if we are currently dragging it)
+
+/// Animate card movements into the player hand, skipping the dragged one.
 fn update_hand(
     hand: Query<&GlobalTransform, With<PlayerHand>>,
     mut cards: Query<HoverQuery>,
@@ -322,6 +346,8 @@ fn update_hand_indexes(mut cards: Query<&mut HandCard>) {
     }
 }
 
+/// Add an underlay to hovered cards to prevent the once-per-frame on/off swap
+/// of cards.
 fn hovered_covers_previous_position(
     mut underlay_visibilities: Query<&mut Visibility, With<Underlay>>,
     statuses: Query<(&HandCard, &CardStatus), Changed<CardStatus>>,

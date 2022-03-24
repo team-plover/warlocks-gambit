@@ -1,3 +1,5 @@
+//! Define an extension trait to add the `on_{update,enter,exit}` methods to
+//! bevy `State`s.
 use bevy::ecs::schedule::{IntoSystemDescriptor, StateData};
 use bevy::prelude::*;
 
