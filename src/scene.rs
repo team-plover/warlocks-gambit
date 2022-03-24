@@ -1,7 +1,12 @@
 //! Load the game scene and add `Component`s from all modules to entities named
 //! in the scene.
-use bevy::prelude::{Plugin as BevyPlugin, *};
-use bevy_mod_raycast::RayCastSource;
+use std::f32::consts::TAU;
+
+use bevy::{
+    pbr::wireframe::Wireframe,
+    prelude::{Plugin as BevyPlugin, *},
+};
+use bevy_mod_raycast::{RayCastMesh, RayCastSource};
 use bevy_scene_hook::{world::SceneHook as WorldSceneHook, SceneInstance};
 
 use crate::{
@@ -11,7 +16,7 @@ use crate::{
     deck::{Deck, DeckAssets, OppoDeck, PlayerDeck},
     oppo_hand::OppoHand,
     pile::{Pile, PileType},
-    player_hand::{HandDisengageArea, HandRaycast, PlayerHand, SleeveArea},
+    player_hand::{CardCollisionAssets, HandDisengageArea, HandRaycast, PlayerHand, SleeveArea},
 };
 
 pub enum Scene {}
@@ -29,6 +34,42 @@ impl WorldSceneHook for Scene {
                 let assets = world.get_resource::<Assets<Deck>>().unwrap();
                 let deck = assets.get(handle).unwrap().clone();
                 world.entity_mut(entity).insert(OppoDeck::new(deck));
+            }
+            "PlayerHand" => {
+                let mesh = world.get_resource::<CardCollisionAssets>().unwrap();
+                let mesh = mesh.circle.clone();
+                world.spawn().insert_bundle((
+                    mesh,
+                    Wireframe,
+                    RayCastMesh::<HandDisengageArea>::default(),
+                    Visibility::default(),
+                    ComputedVisibility::default(),
+                    Parent(entity),
+                    GlobalTransform::default(),
+                    Transform {
+                        rotation: Quat::from_rotation_y(TAU / 2.),
+                        scale: Vec3::new(1.75, 1.5, 1.75),
+                        translation: Vec3::ZERO,
+                    },
+                ));
+            }
+            "PlayerSleeveStash" => {
+                let mesh = world.get_resource::<CardCollisionAssets>().unwrap();
+                let mesh = mesh.circle.clone();
+                world.spawn().insert_bundle((
+                    mesh,
+                    Wireframe,
+                    RayCastMesh::<SleeveArea>::default(),
+                    Visibility::default(),
+                    ComputedVisibility::default(),
+                    Parent(entity),
+                    GlobalTransform::default(),
+                    Transform {
+                        rotation: Quat::from_rotation_y(TAU / 2.),
+                        scale: Vec3::new(1., 0.7, 1.),
+                        translation: Vec3::new(0., 1.7, 0.2),
+                    },
+                ));
             }
             _ => {}
         }

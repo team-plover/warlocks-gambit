@@ -81,6 +81,18 @@ fn control_bird_pupil(
     }
 }
 
+// HACK: fix the transform of the child mesh used for detecting we are hovering
+// the sleeve not updating correctly on being loaded.
+// This is because bavy doesn't properly update the transform of children that
+// were just added if the parent transform is never updated after it being added.
+fn update_sleeve_transform(
+    mut transform: Query<&mut Transform, (With<PlayerSleeve>, Changed<Children>)>,
+) {
+    if let Ok(transform) = transform.get_single_mut() {
+        let _ = transform.into_inner();
+    }
+}
+
 fn execute_cheat(
     game_starts: Res<GameStarts>,
     mut bird_eye: Query<&mut Animated, With<BirdPupilRoot>>,
@@ -143,6 +155,7 @@ impl BevyPlugin for Plugin {
         app.add_event::<CheatEvent>()
             .init_resource::<BirdEye>()
             .add_system_set(SystemSet::on_exit(self.0).with_system(cleanup))
+            .add_system_set(SystemSet::on_update(self.0).with_system(update_sleeve_transform))
             .add_system(use_seed)
             .add_system(follow_sleeve)
             .add_system(control_bird_pupil)

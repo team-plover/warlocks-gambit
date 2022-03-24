@@ -53,6 +53,22 @@ pub enum HandDisengageArea {}
 /// Where if we disengage the card, the card will fall into the sleeve.
 pub enum SleeveArea {}
 
+#[rustfmt::skip]
+const AREA_VERTICES: [[f32; 2]; 9] = [
+    [0.0, 0.0],
+    [0.0, 1.0], [ 0.7,  0.7],
+    [1.0, 0.0], [ 0.7, -0.7],
+    [0.0, -1.], [-0.7, -0.7],
+    [-1., 0.0], [-0.7,  0.7],
+];
+
+#[rustfmt::skip]
+const AREA_EDGES: [u16; 24] = [
+    0, 1, 2,    2, 3, 0,    3, 4, 0,
+    4, 5, 0,    5, 6, 0,    6, 7, 0,
+    7, 8, 0,    8, 1, 0,
+];
+
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component)]
 struct HandCard {
@@ -70,13 +86,28 @@ impl HandCard {
 pub struct CardCollisionAssets {
     bounding_box: Handle<Mesh>,
     underlay: Handle<Mesh>,
+    pub circle: Handle<Mesh>,
 }
 impl FromWorld for CardCollisionAssets {
     fn from_world(world: &mut World) -> Self {
+        use bevy::render::{
+            mesh::{
+                Indices,
+                VertexAttributeValues::{Float32x2, Float32x3},
+            },
+            render_resource::PrimitiveTopology,
+        };
+        let pos: Vec<[f32; 3]> = AREA_VERTICES.iter().map(|&[x, y]| [x, y, 0.0]).collect();
+        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, Float32x3(pos));
+        mesh.set_indices(Some(Indices::U16(AREA_EDGES.into())));
+        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, Float32x2([[0., 0.]; 9].into()));
+        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, Float32x3([[0., 0., 1.]; 9].into()));
         let mut meshes = world.get_resource_mut::<Assets<Mesh>>().unwrap();
         Self {
             bounding_box: meshes.add(shape::Quad::new(Vec2::new(2.3, 3.3)).into()),
             underlay: meshes.add(shape::Quad::new(Vec2::new(2.4, 6.3)).into()),
+            circle: meshes.add(mesh),
         }
     }
 }
@@ -151,11 +182,19 @@ fn draw_hand(
 /// Update the `bevy_mod_raycast` `RayCastSource` each frame so that it tracks
 /// the cursor position.
 fn update_raycast(
-    mut query: Query<&mut RayCastSource<HandRaycast>>,
+    mut hand: Query<&mut RayCastSource<HandRaycast>>,
+    mut disengage: Query<&mut RayCastSource<HandDisengageArea>>,
+    mut sleeve: Query<&mut RayCastSource<SleeveArea>>,
     mut cursor: EventReader<CursorMoved>,
 ) {
     if let Some(cursor) = cursor.iter().last() {
-        for mut pick_source in query.iter_mut() {
+        for mut pick_source in hand.iter_mut() {
+            pick_source.cast_method = RayCastMethod::Screenspace(cursor.position);
+        }
+        for mut pick_source in disengage.iter_mut() {
+            pick_source.cast_method = RayCastMethod::Screenspace(cursor.position);
+        }
+        for mut pick_source in sleeve.iter_mut() {
             pick_source.cast_method = RayCastMethod::Screenspace(cursor.position);
         }
     }
@@ -202,6 +241,8 @@ enum HandEvent {
 fn play_card(
     mouse: Res<Input<MouseButton>>,
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
+    disengage_raycaster: Query<&RayCastSource<HandDisengageArea>>,
+    sleeve_raycaster: Query<&RayCastSource<SleeveArea>>,
     mut card_events: EventWriter<PlayCard>,
     mut cmds: Commands,
     mut hand_cards: Query<(Entity, &mut CardStatus, &mut HandCard, &mut Transform)>,
@@ -212,6 +253,8 @@ fn play_card(
 ) {
     use CardStatus::Hovered;
     let query = hand_raycaster.get_single().map(|ray| ray.intersect_top());
+    let is_disengaging = || disengage_raycaster.single().intersect_top().is_some();
+    let is_sleeving = || sleeve_raycaster.single().intersect_top().is_some();
     for (entity, mut hover_state, mut card, mut trans) in hand_cards.iter_mut() {
         match (*hover_state, card.dragging) {
             (Hovered, false) if mouse.just_pressed(MouseButton::Left) => {
@@ -219,23 +262,23 @@ fn play_card(
                 if entity == under_cursor {
                     cmds.entity(entity).insert(GrabbedCard);
                     card.dragging = true;
+                    // Move toward camera so no z-fighting with other cards
+                    trans.translation.z += 1.0;
                     break;
                 }
             }
             (_, false) => {}
             (_, true) if mouse.just_released(MouseButton::Left) => {
-                let word_cursor = if let Ok(Some((_, i))) = query { i } else { break };
-                let cursor_pos = word_cursor.position();
                 let cards_remaining = card_drawer.deck().remaining() != 0;
                 let can_sleeve = sleeve_cards.iter().count() < 3 && cards_remaining;
                 cmds.entity(entity).remove::<GrabbedCard>();
                 *hover_state = CardStatus::Normal;
-                if cursor_pos.x < -1.0 && cursor_pos.y < 4.7 && can_sleeve {
+                if is_sleeving() && can_sleeve {
                     cmds.entity(entity).remove::<HandCard>();
                     cheat_events.send(CheatEvent::HideInSleeve(entity));
                     hand_events.send(HandEvent::LowerSleeve);
                     card_drawer.draw(1);
-                } else if cursor_pos.x > 0.2 || cursor_pos.y > 6.0 {
+                } else if !is_disengaging() {
                     cmds.entity(entity).remove::<HandCard>();
                     cmds.entity(entity).remove::<RayCastMesh<HandRaycast>>();
                     card_events.send(PlayCard::new(entity, Participant::Player));
@@ -251,7 +294,7 @@ fn play_card(
                 // FIXME: use size_hint().0 when bevy#4244 pr is merged
                 let can_sleeve = sleeve_cards.iter().count() < 3 && cards_remaining;
                 trans.translation = cursor_pos;
-                if cursor_pos.x < -1.0 && cursor_pos.y < 4.7 && can_sleeve {
+                if is_sleeving() && can_sleeve {
                     hand_events.send(HandEvent::RaiseSleeve);
                 } else {
                     hand_events.send(HandEvent::LowerSleeve);
@@ -364,6 +407,8 @@ impl BevyPlugin for Plugin {
         #[cfg(feature = "debug")]
         app.register_inspectable::<HandCard>();
         app.add_plugin(DefaultRaycastingPlugin::<HandRaycast>::default())
+            .add_plugin(DefaultRaycastingPlugin::<SleeveArea>::default())
+            .add_plugin(DefaultRaycastingPlugin::<HandDisengageArea>::default())
             .add_event::<HandEvent>()
             .init_resource::<CardCollisionAssets>()
             .add_system_set(SystemSet::on_enter(TurnState::Draw).with_system(draw_hand))
