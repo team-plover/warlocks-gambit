@@ -16,6 +16,7 @@ use std::f32::consts::FRAC_PI_4;
 
 use bevy::{
     ecs::{query::QueryItem, system::SystemParam},
+    math::EulerRot::XYZ,
     pbr::wireframe::Wireframe,
     prelude::{Plugin as BevyPlugin, *},
 };
@@ -263,7 +264,9 @@ fn play_card(
                     cmds.entity(entity).insert(GrabbedCard);
                     card.dragging = true;
                     // Move toward camera so no z-fighting with other cards
-                    trans.translation.z += 1.0;
+                    // Not too much otherwise card offset on screen causes bug
+                    // because it's not under the cursor anymore
+                    trans.translation.z += 0.15;
                     break;
                 }
             }
@@ -309,7 +312,7 @@ fn play_card(
 // the player's turn
 // TODO: animate sleeve movement
 /// Move sleeve up/down based on whether the player is currently dragging over
-/// the sleeve hot zone.
+/// the sleeve hot zone. Also move the card the player is dragging into it.
 fn update_sleeve(
     mut cmds: Commands,
     mut hand: Query<(Entity, &mut Transform), With<PlayerHand>>,
@@ -319,11 +322,12 @@ fn update_sleeve(
     time: Res<Time>,
 ) {
     let (hand, mut trans) = hand.single_mut();
-    let sleeve_move = Vec3::Y * 1.5;
     if *raised {
         if let Some((mut trans, _)) = cards.iter_mut().find(|c| c.1.dragging) {
             let delta = time.delta_seconds();
-            trans.rotation = trans.rotation.lerp(Quat::IDENTITY, delta * 10.0);
+            let (x, y, _) = trans.rotation.to_euler(XYZ);
+            let target_rot = Quat::from_euler(XYZ, x, y, 0.1);
+            trans.rotation = trans.rotation.lerp(target_rot, delta * 10.0);
         }
     }
     for event in events.iter() {
@@ -331,12 +335,14 @@ fn update_sleeve(
             HandEvent::RaiseSleeve if !*raised => {
                 cmds.entity(hand).insert(DisableAnimation);
                 *raised = true;
-                trans.translation += sleeve_move;
+                let offset = 1.5 * trans.up();
+                trans.translation += offset;
             }
             HandEvent::LowerSleeve if *raised => {
                 *raised = false;
                 cmds.entity(hand).remove::<DisableAnimation>();
-                trans.translation -= sleeve_move;
+                let offset = 1.5 * trans.up();
+                trans.translation -= offset;
             }
             _ => {}
         }
@@ -366,7 +372,7 @@ fn update_hand(
         let y_offset = i_f32.cos() * hover_mul;
         let x_offset = i_f32.sin() * hover_mul;
         let z_offset = i_f32 * -0.01;
-        let target = Vec3::new(x_offset - 0.3, y_offset, z_offset + 0.05);
+        let target = Vec3::new(x_offset - 0.3, y_offset, z_offset + 0.04);
         let target = hand_pos + hand_rot * target;
         let origin = transform.translation;
         transform.translation += (target - origin) * card_speed;
