@@ -46,18 +46,15 @@ impl FromWorld for UiAssets {
 }
 
 fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
-    let text = |content: &str| {
+    let text_sized = |content: &str, font_size| {
         let color = Color::NAVY;
         let horizontal = HorizontalAlign::Left;
-        let style = TextStyle {
-            color,
-            font: ui_assets.font.clone(),
-            font_size: 60.0,
-        };
+        let style = TextStyle { color, font: ui_assets.font.clone(), font_size };
         let align = TextAlignment { horizontal, ..Default::default() };
         let text = Text::with_section(content, style, align);
         TextBundle { text, ..Default::default() }
     };
+    let text = |content: &str| text_sized(content, 60.0);
     let node = NodeBundle {
         color: Color::NONE.into(),
         style: style! {
@@ -86,7 +83,8 @@ fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
                 align_items: AlignItems::FlexEnd
             }[;Name::new("game ui right column")](
                 node[; Name::new("Seeds")](
-                    node[text("Seeds: ");],
+                    node[text_sized("(space to use)", 30.0);],
+                    node[text("Seeds:");],
                     node[text("0"); UiInfo::Seeds]
                 ),
             )

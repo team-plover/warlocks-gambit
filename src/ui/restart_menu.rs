@@ -63,6 +63,7 @@ fn handle_gameover_event(
 
         let focusable = Focusable::default();
         let cursor = MenuCursor::spawn_ui_element(&mut commands);
+        let defeat_hint = "Having difficulties? The game rules are in the main menu.";
         build_ui! {
             #[cmd(commands)]
             node{ size: size!(100 pct, 100 pct) }[;Name::new("Restart Menu root"), RestartMenuRoot](
@@ -74,7 +75,16 @@ fn handle_gameover_event(
                 ],
                 node[; Name::new("Menu columns")](
                     entity[image; style! { size: size!(auto, 45 pct), }],
-                    entity[ui_assets.large_text(continue_text);],
+                    entity[
+                        ui_assets.large_text(continue_text);
+                        style! { margin: rect!(0 px, 0 px, 0 px, 60 px,), }
+                    ],
+                    if (matches!(*reason, Loss | CaughtCheating)) {
+                        entity[
+                            ui_assets.text_bundle(defeat_hint, 30.0);
+                            style! { margin: rect!(0 px, 0 px, 0 px, 30 px,), }
+                        ]
+                    },
                     entity[ui_assets.large_text("Main menu"); focusable, MainMenu],
                     if (cfg!(target_arch = "wasm32")) {
                         entity[ui_assets.large_text("(Press space to restart)");]
