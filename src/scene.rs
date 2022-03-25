@@ -137,12 +137,7 @@ fn load_scene(
     mut scene_spawner: ResMut<SceneSpawner>,
     asset_server: Res<AssetServer>,
 ) {
-    let scene_name = if cfg!(feature = "debug") {
-        "scene_debug.glb#Scene0"
-    } else {
-        "scene.glb#Scene0"
-    };
-    let scene = scene_spawner.spawn(asset_server.load(scene_name));
+    let scene = scene_spawner.spawn(asset_server.load("scene.glb#Scene0"));
     cmds.spawn().insert(SceneInstance::<Scene>::new(scene));
 }
 
