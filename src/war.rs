@@ -213,7 +213,7 @@ impl Card {
         }
     }
     pub fn max_value(&self) -> i32 {
-        let value = self.value as i32;
+        let value = self.value_i32();
         let word_max_bonus = match self.word {
             // Zero = 12
             Some(WordOfPower::Geh) => 12,
@@ -232,9 +232,12 @@ impl Card {
         let zero_bonus = |c| is_zero(c) * zero_bonus;
         let mul_bonus = is_word(self, Qube) + is_word(other, Qube);
         (
-            zero_bonus(self) * (mul_bonus + 1) + self.value as i32 * mul_bonus,
-            zero_bonus(other) * (mul_bonus + 1) + other.value as i32 * mul_bonus,
+            zero_bonus(self) * (mul_bonus + 1) + self.value_i32() * mul_bonus,
+            zero_bonus(other) * (mul_bonus + 1) + other.value_i32() * mul_bonus,
         )
+    }
+    pub fn value_i32(&self) -> i32 {
+        self.value as i32
     }
 }
 #[cfg(test)]

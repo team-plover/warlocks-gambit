@@ -7,6 +7,7 @@ use bevy_ui_build_macros::{build_ui, size, style, unit};
 use enum_map::{enum_map, EnumMap};
 
 use crate::{
+    animate::Animated,
     game_flow::{CardStats, SeedCount},
     numbers::Number,
     state::GameState,
@@ -31,6 +32,7 @@ struct CardEffectImage;
 
 pub enum ScoreEvent {
     Add(Participant, i32),
+    Reset,
 }
 #[derive(Component, Clone)]
 enum UiInfo {
@@ -201,20 +203,37 @@ fn handle_effect_events(
     }
 }
 
+type ScoreComponents = (Entity, &'static mut Number);
 fn update_score(
-    mut player_score: Query<&mut Number, With<PlayerScore>>,
-    mut oppo_score: Query<&mut Number, (With<OppoScore>, Without<PlayerScore>)>,
+    mut player_score: Query<ScoreComponents, With<PlayerScore>>,
+    mut oppo_score: Query<ScoreComponents, (With<OppoScore>, Without<PlayerScore>)>,
     mut events: EventReader<ScoreEvent>,
+    mut cmds: Commands,
+    stats: CardStats,
 ) {
-    for ScoreEvent::Add(participant, additional) in events.iter() {
-        match *participant {
-            Participant::Oppo => {
-                let mut oppo_score = oppo_score.single_mut();
-                oppo_score.value += *additional;
+    for event in events.iter() {
+        match event {
+            ScoreEvent::Add(participant, additional) => {
+                let ((entity, mut number), score) = match *participant {
+                    Participant::Oppo => (oppo_score.single_mut(), stats.oppo_score()),
+                    Participant::Player => (player_score.single_mut(), stats.player_score()),
+                };
+                number.value = score;
+                cmds.entity(entity).with_children(|cmds| {
+                    cmds.spawn_bundle((
+                        Animated::RiseAndFade { duration: 1.2, direction: Vec3::Y * 2.5 },
+                        Number::new(*additional, participant.color()),
+                        Transform::from_translation(Vec3::Y * 2.),
+                        GlobalTransform::default(),
+                    ));
+                });
             }
-            Participant::Player => {
-                let mut player_score = player_score.single_mut();
-                player_score.value += *additional;
+            ScoreEvent::Reset => {
+                screen_print!("Resetting scores!");
+                let (_, mut score) = oppo_score.single_mut();
+                score.value = 0;
+                let (_, mut score) = player_score.single_mut();
+                score.value = 0;
             }
         }
     }
@@ -237,22 +256,26 @@ fn update_game_ui(
         }
     }
 }
+fn reset_scores(mut events: EventWriter<ScoreEvent>) {
+    events.send(ScoreEvent::Reset);
+}
 
 pub struct Plugin(pub GameState);
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
+        use crate::system_helper::EasySystemSetCtor;
         app.init_resource::<UiAssets>()
             .add_event::<EffectEvent>()
             .add_event::<ScoreEvent>()
             .init_resource::<EffectDisplay>()
-            .add_system_set(SystemSet::on_enter(self.0).with_system(spawn_game_ui))
+            .add_system_set(self.0.on_enter(spawn_game_ui).with_system(reset_scores))
             .add_system(hide_effects)
+            .add_system(update_score)
             .add_system_set(
-                SystemSet::on_update(self.0)
-                    .with_system(update_game_ui)
-                    .with_system(update_score)
+                self.0
+                    .on_update(update_game_ui)
                     .with_system(handle_effect_events),
             )
-            .add_system_set(SystemSet::on_exit(self.0).with_system(despawn_game_ui));
+            .add_system_set(self.0.on_exit(despawn_game_ui));
     }
 }

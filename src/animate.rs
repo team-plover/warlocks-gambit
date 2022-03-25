@@ -2,6 +2,7 @@
 use std::f64::consts::PI;
 
 use bevy::prelude::{Plugin as BevyPlugin, *};
+use bevy_debug_text_overlay::screen_print;
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
@@ -15,20 +16,25 @@ pub enum Animated {
     /// Change `scale` to give a feeling of breathing.
     Breath {
         offset: f64,
-        strength: f32,
         period: f64,
+        strength: f32,
     },
     /// Bob up and down, offset by `f32` seconds.
     Bob {
         offset: f64,
-        strength: f32,
         period: f64,
+        strength: f32,
     },
     /// Go in a cirlce on provided axis.
     Circle {
         offset: f64,
-        radius: f32,
         period: f64,
+        radius: f32,
+    },
+    /// Go in direction for seconds and progressively become tinny.
+    RiseAndFade {
+        duration: f32,
+        direction: Vec3,
     },
     Static,
 }
@@ -43,32 +49,44 @@ impl Animated {
 
 #[cfg_attr(feature = "debug", derive(Inspectable))]
 #[derive(Component)]
-struct InitialTransform(Transform);
+struct AnimationState {
+    transform: Transform,
+    time: f64,
+}
 
-fn enable_animation(animated: Query<(Entity, &Transform), Added<Animated>>, mut cmds: Commands) {
+fn enable_animation(
+    time: Res<Time>,
+    animated: Query<(Entity, &Transform), Added<Animated>>,
+    mut cmds: Commands,
+) {
     let mut cmd_buffer = Vec::new();
-    for (entity, transform) in animated.iter() {
-        cmd_buffer.push((entity, (InitialTransform(*transform),)));
+    for (entity, &transform) in animated.iter() {
+        let state = AnimationState { transform, time: time.seconds_since_startup() };
+        cmd_buffer.push((entity, (state,)));
     }
     cmds.insert_or_spawn_batch(cmd_buffer);
 }
 
 fn reset_static(
-    mut animated: Query<(&mut Transform, &InitialTransform, &Animated), Changed<Animated>>,
+    mut animated: Query<(&mut Transform, &AnimationState, &Animated), Changed<Animated>>,
 ) {
     for (mut trans, init, anim) in animated.iter_mut() {
         if matches!(anim, Animated::Static) {
-            *trans = init.0;
+            *trans = init.transform;
         }
     }
 }
 
 fn run_animation(
     time: Res<Time>,
-    mut animated: Query<(&mut Transform, &InitialTransform, &Animated), Without<DisableAnimation>>,
+    mut cmds: Commands,
+    mut animated: Query<
+        (Entity, &mut Transform, &AnimationState, &Animated),
+        Without<DisableAnimation>,
+    >,
 ) {
     let time = time.seconds_since_startup();
-    for (mut trans, init, anim) in animated.iter_mut() {
+    for (entity, mut trans, init, anim) in animated.iter_mut() {
         match *anim {
             Animated::Static => {}
             Animated::Bob { offset, strength, period } => {
@@ -76,7 +94,7 @@ fn run_animation(
                 // ao = 0 → 0; ao = 1 → 0.2; ao = 2 → 0
                 let with_strength = (anim_offset as f32).sin() * strength;
                 let space_offset = Vec3::Y * with_strength;
-                trans.translation = init.0.translation + space_offset;
+                trans.translation = init.transform.translation + space_offset;
             }
             Animated::Breath { offset, strength, period } => {
                 let anim_offset = (time + offset) % period / period * PI * 2.0;
@@ -86,12 +104,26 @@ fn run_animation(
                     0.0,
                     (anim_offset as f32).cos() * strength,
                 );
-                trans.scale = init.0.scale + scale_offset;
+                trans.scale = init.transform.scale + scale_offset;
+            }
+            Animated::RiseAndFade { duration, direction } => {
+                let delta = (time - init.time) as f32;
+                let expiring = delta - duration > 0.0;
+                let extra_delta = if expiring { delta - duration } else { 0.0 };
+                let scale = 1.0 - extra_delta;
+                if scale <= 0.0 {
+                    screen_print!("Despawning a RiseAndFade animation");
+                    cmds.entity(entity).despawn_recursive();
+                } else {
+                    let offset = delta.min(duration) + extra_delta * 0.7;
+                    trans.translation = init.transform.translation + direction * offset;
+                    trans.scale = Vec3::splat(scale);
+                }
             }
             Animated::Circle { offset, period, radius } => {
                 let anim_offset = ((time + offset) % period / period * PI * 2.0) as f32;
                 let trans_offset = Vec3::new(anim_offset.sin(), anim_offset.cos(), 0.0) * radius;
-                trans.translation = init.0.translation + trans_offset;
+                trans.translation = init.transform.translation + trans_offset;
             }
         }
     }
@@ -102,7 +134,7 @@ impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         #[cfg(feature = "debug")]
         app.register_inspectable::<Animated>()
-            .register_inspectable::<InitialTransform>();
+            .register_inspectable::<AnimationState>();
 
         app.add_system(enable_animation)
             .add_system(reset_static)

@@ -53,7 +53,7 @@ type SpriteComponents = (
     &'static mut Handle<StandardMaterial>,
 );
 fn display_number(
-    numbers: Query<&Number, Changed<Number>>,
+    numbers: Query<&Number, Or<(Changed<Children>, Changed<Number>)>>,
     mut sprites: Query<SpriteComponents, With<NumberSprite>>,
     assets: Res<NumberAssets>,
     mut mats: ResMut<Assets<StandardMaterial>>,
