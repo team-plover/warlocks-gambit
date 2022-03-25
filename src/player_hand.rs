@@ -31,7 +31,9 @@ use crate::{
     cheat::{CheatEvent, SleeveCard},
     deck::PlayerDeck,
     game_flow::PlayCard,
+    game_ui::EffectEvent,
     state::{GameState, TurnState},
+    war::Card,
     Participant,
 };
 
@@ -206,8 +208,9 @@ fn update_raycast(
 fn hover_card(
     hand_raycaster: Query<&RayCastSource<HandRaycast>>,
     mouse: Res<Input<MouseButton>>,
-    mut hand_cards: Query<(Entity, &mut CardStatus)>,
+    mut hand_cards: Query<(Entity, &Card, &mut CardStatus)>,
     mut audio: EventWriter<AudioRequest>,
+    mut ui_events: EventWriter<EffectEvent>,
 ) {
     if mouse.pressed(MouseButton::Left) {
         return;
@@ -218,14 +221,22 @@ fn hover_card(
         if hand_cards.get(card_under_cursor).is_err() {
             return;
         }
-        for (entity, mut hover) in hand_cards.iter_mut() {
+        let mut already_new_word_description = false;
+        for (entity, card, mut hover) in hand_cards.iter_mut() {
             let is_under_cursor = entity == card_under_cursor;
             let is_hovering = *hover == CardStatus::Hovered;
             if is_under_cursor && !is_hovering {
                 *hover = CardStatus::Hovered;
+                if let Some(word) = card.word {
+                    already_new_word_description = true;
+                    ui_events.send(EffectEvent::Show(word));
+                }
                 audio.send(PlayShuffleShort);
             }
             if !is_under_cursor && is_hovering {
+                if card.word.is_some() && !already_new_word_description {
+                    ui_events.send(EffectEvent::Hide);
+                }
                 *hover = CardStatus::Normal;
             }
         }

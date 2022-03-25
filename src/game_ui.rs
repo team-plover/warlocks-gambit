@@ -3,8 +3,7 @@ use std::fmt::Write;
 
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_debug_text_overlay::screen_print;
-use bevy_ui_build_macros::{build_ui, size, style, unit};
-use enum_map::{enum_map, EnumMap};
+use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
 
 use crate::{
     animate::Animated,
@@ -27,9 +26,6 @@ pub struct OppoScore;
 #[derive(Component, Clone)]
 struct CardEffectDescription;
 
-#[derive(Component, Clone)]
-struct CardEffectImage;
-
 pub enum ScoreEvent {
     Add(Participant, i32),
     Reset,
@@ -41,15 +37,11 @@ enum UiInfo {
 
 struct UiAssets {
     font: Handle<Font>,
-    words: EnumMap<WordOfPower, Handle<Image>>,
 }
 impl FromWorld for UiAssets {
     fn from_world(world: &mut World) -> Self {
         let assets = world.get_resource::<AssetServer>().unwrap();
-        Self {
-            font: assets.load("Boogaloo-Regular.otf"),
-            words: enum_map! { word => assets.load(&format!("cards/Word{word:?}.png")) },
-        }
+        Self { font: assets.load("Boogaloo-Regular.otf") }
     }
 }
 
@@ -81,17 +73,12 @@ fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
             node{ size: size!(20 pct, 100 pct) },
             node{
                 size: size!(60 pct, 100 pct),
-                justify_content: JustifyContent::Center,
-                flex_direction: FlexDirection::ColumnReverse,
+                padding: rect!(auto, 7 pct),
+                justify_content: JustifyContent::FlexStart,
+                flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center
             }[; Name::new("game ui effect display")](
-                    node[
-                        ImageBundle::default();
-                        style! { max_size: size!(470 px, 200 px), },
-                        Visibility { is_visible: false },
-                        CardEffectImage
-                    ],
-                    entity[text(""); CardEffectDescription]
+                entity[text(""); CardEffectDescription]
             ),
             node{
                 size: size!(20 pct, 100 pct),
@@ -114,68 +101,23 @@ fn despawn_game_ui(mut cmds: Commands, query: Query<Entity, With<UiRoot>>) {
 #[derive(PartialEq)]
 pub enum EffectEvent {
     Show(WordOfPower),
+    Hide,
     UseSeed,
     EndCheat,
-    TutoGetSeed,
-    TutoUseSeed,
-    TutoSleeve,
-}
-
-/// Show effect description on screen
-///
-/// NOTE: to remove it, you need to set the `timeout` to lower than current time
-#[derive(Default)]
-struct EffectDisplay {
-    showing: bool,
-    timeout: f64,
-}
-
-fn hide_effects(
-    time: Res<Time>,
-    mut display: ResMut<EffectDisplay>,
-    mut image: Query<&mut Visibility, With<CardEffectImage>>,
-    mut description: Query<&mut Text, With<CardEffectDescription>>,
-) {
-    if display.showing && display.timeout <= time.seconds_since_startup() {
-        if let Ok(mut img) = image.get_single_mut() {
-            img.is_visible = false;
-        }
-        if let Ok(mut txt) = description.get_single_mut() {
-            txt.sections[0].value.clear();
-        }
-        display.showing = false;
-    }
 }
 
 fn handle_effect_events(
     mut events: EventReader<EffectEvent>,
-    mut display: ResMut<EffectDisplay>,
-    mut image: Query<(&mut UiImage, &mut Visibility), With<CardEffectImage>>,
     mut description: Query<&mut Text, With<CardEffectDescription>>,
-    ui_assets: Res<UiAssets>,
-    time: Res<Time>,
 ) {
     use EffectEvent::*;
     for event in events.iter() {
         match event {
-            TutoGetSeed | TutoUseSeed | TutoSleeve => {
-                display.showing = true;
-                display.timeout = time.seconds_since_startup() + 5.0;
+            Hide => {
                 let txt_box = &mut description.single_mut().sections[0];
-                txt_box.style.color = Color::ORANGE_RED;
-                txt_box.style.font_size = 70.0;
                 txt_box.value.clear();
-                let text = match event {
-                    TutoUseSeed => "A seed! Perfect to distract the bird\nPress space bar to use your seed",
-                    TutoGetSeed => "This is unfair! The deck is stacked!\nOnly way out is cheating\nBut how? The bird is watching...",
-                    TutoSleeve => "Now that the bird can't see you,\ngrab a card and slip it into your sleeve!",
-                    Show(_) | UseSeed | EndCheat => "BUGBUGBUG D:",
-                };
-                write!(txt_box.value, "{}", text).unwrap();
             }
             UseSeed | EndCheat => {
-                display.showing = true;
-                display.timeout = time.seconds_since_startup() + 3.0;
                 let txt_box = &mut description.single_mut().sections[0];
                 txt_box.style.color = Color::ANTIQUE_WHITE;
                 txt_box.style.font_size = 50.0;
@@ -183,21 +125,16 @@ fn handle_effect_events(
                 let text = match event {
                     UseSeed => "Used seed, now is the time to cheat!",
                     EndCheat => "The bird is watching again!",
-                    Show(_) | TutoUseSeed | TutoSleeve | TutoGetSeed => "BUGBUGBUG D:",
+                    Show(_) | Hide => "BUGBUGBUG D:",
                 };
                 write!(txt_box.value, "{}", text).unwrap();
             }
             Show(word) => {
-                display.showing = true;
-                display.timeout = time.seconds_since_startup() + 1.5;
                 let txt_box = &mut description.single_mut().sections[0];
                 txt_box.style.color = word.color();
                 txt_box.style.font_size = 60.0;
                 txt_box.value.clear();
                 write!(txt_box.value, "{}", word.flavor_text()).unwrap();
-                let (mut img, mut visibility) = image.single_mut();
-                img.0 = ui_assets.words[*word].clone();
-                visibility.is_visible = true;
             }
         }
     }
@@ -267,9 +204,7 @@ impl BevyPlugin for Plugin {
         app.init_resource::<UiAssets>()
             .add_event::<EffectEvent>()
             .add_event::<ScoreEvent>()
-            .init_resource::<EffectDisplay>()
             .add_system_set(self.0.on_enter(spawn_game_ui).with_system(reset_scores))
-            .add_system(hide_effects)
             .add_system(update_score)
             .add_system_set(
                 self.0

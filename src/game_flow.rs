@@ -99,7 +99,7 @@ use crate::{
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
     war::{BattleOutcome, Card, WordOfPower::Egeq},
-    CardOrigin, EndReason, GameOver, GameStarts, Participant,
+    CardOrigin, EndReason, GameOver, Participant,
 };
 
 /// Cards in the War pile
@@ -182,8 +182,6 @@ fn handle_played(
     mut turn: ResMut<State<TurnState>>,
     mut seed_count: ResMut<SeedCount>,
     mut audio_events: EventWriter<AudioRequest>,
-    mut tuto_shown: Local<bool>,
-    game_starts: Res<GameStarts>,
     cards: Query<&Card>,
 ) {
     use PileType::War;
@@ -195,15 +193,10 @@ fn handle_played(
         let card_word = cards.get(*card).map(|c| c.word);
         audio_events.send(AudioRequest::PlayShuffleLong);
         if let Ok(Some(word)) = card_word {
-            // TODO: spawn clouds of smoke
             ui_events.send(EffectEvent::Show(word));
             audio_events.send(AudioRequest::PlayWord(word));
         }
         if let Ok(Some(Egeq)) = card_word {
-            if game_starts.0 == 2 && !*tuto_shown {
-                *tuto_shown = true;
-                ui_events.send(EffectEvent::TutoUseSeed);
-            }
             seed_count.0 += 1;
         }
         turn.set(TurnState::CardPlayed).unwrap();

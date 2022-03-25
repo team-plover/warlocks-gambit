@@ -52,6 +52,7 @@ type SpriteComponents = (
     &'static mut Visibility,
     &'static mut Handle<StandardMaterial>,
 );
+#[allow(clippy::type_complexity)]
 fn display_number(
     numbers: Query<&Number, Or<(Changed<Children>, Changed<Number>)>>,
     mut sprites: Query<SpriteComponents, With<NumberSprite>>,
