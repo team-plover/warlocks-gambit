@@ -12,7 +12,7 @@ use bevy_debug_text_overlay::screen_print;
 
 use crate::{
     animate::Animated, game_flow::SeedCount, game_ui::EffectEvent, player_hand::GrabbedCard,
-    state::GameState, EndReason, GameOver, GameStarts,
+    state::GameState, EndReason, GameOver,
 };
 
 #[derive(Component)]
@@ -43,8 +43,14 @@ impl Default for BirdEye {
     }
 }
 
-fn cleanup(mut bird_eye: ResMut<BirdEye>) {
+fn cleanup(
+    mut bird_eye: ResMut<BirdEye>,
+    mut bird_eye_anim: Query<&mut Animated, With<BirdPupilRoot>>,
+) {
     *bird_eye = BirdEye::default();
+    if let Ok(mut bird_eye_anim) = bird_eye_anim.get_single_mut() {
+        *bird_eye_anim = Animated::Static;
+    }
 }
 
 fn use_seed(
@@ -94,14 +100,12 @@ fn update_sleeve_transform(
 }
 
 fn execute_cheat(
-    game_starts: Res<GameStarts>,
     mut bird_eye: Query<&mut Animated, With<BirdPupilRoot>>,
     mut gameover_events: EventWriter<GameOver>,
     mut ui: EventWriter<EffectEvent>,
     mut watch: ResMut<BirdEye>,
     mut cmds: Commands,
     mut events: EventReader<CheatEvent>,
-    mut tuto_shown: Local<bool>,
 ) {
     for event in events.iter() {
         match event {
@@ -109,10 +113,6 @@ fn execute_cheat(
                 watch.is_watching = false;
                 if let Ok(mut anim) = bird_eye.get_single_mut() {
                     *anim = Animated::Circle { radius: 0.1, period: 1.0, offset: 0.0 };
-                }
-                if game_starts.0 == 2 && !*tuto_shown {
-                    *tuto_shown = true;
-                    ui.send(EffectEvent::TutoSleeve);
                 }
             }
             CheatEvent::HideInSleeve(_) if watch.is_watching => {

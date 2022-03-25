@@ -7,6 +7,14 @@ The game was developped in seven days for the first bevy game jam.
 
 You can play it at https://gibonus.itch.io/warlocks-gambit
 
+## Documentation
+
+The crate is relatively well documented. The documentation is meant to be
+explored using `rustdoc`, so please clone locally this repository and run
+`cargo doc --document-private-items --open` to get access to the
+documentation.
+
+
 ## License
 
 ### Assets

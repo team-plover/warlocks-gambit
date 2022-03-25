@@ -95,11 +95,11 @@ use crate::{
     audio::AudioRequest,
     cheat::SleeveCard,
     deck::{OppoDeck, PlayerDeck},
-    game_ui::EffectEvent,
+    game_ui::{EffectEvent, ScoreEvent},
     pile::{Pile, PileCard, PileType},
     state::{GameState, TurnState},
     war::{BattleOutcome, Card, WordOfPower::Egeq},
-    CardOrigin, EndReason, GameOver, GameStarts, Participant,
+    CardOrigin, EndReason, GameOver, Participant,
 };
 
 /// Cards in the War pile
@@ -182,8 +182,6 @@ fn handle_played(
     mut turn: ResMut<State<TurnState>>,
     mut seed_count: ResMut<SeedCount>,
     mut audio_events: EventWriter<AudioRequest>,
-    mut tuto_shown: Local<bool>,
-    game_starts: Res<GameStarts>,
     cards: Query<&Card>,
 ) {
     use PileType::War;
@@ -195,15 +193,10 @@ fn handle_played(
         let card_word = cards.get(*card).map(|c| c.word);
         audio_events.send(AudioRequest::PlayShuffleLong);
         if let Ok(Some(word)) = card_word {
-            // TODO: spawn clouds of smoke
             ui_events.send(EffectEvent::Show(word));
             audio_events.send(AudioRequest::PlayWord(word));
         }
         if let Ok(Some(Egeq)) = card_word {
-            if game_starts.0 == 2 && !*tuto_shown {
-                *tuto_shown = true;
-                ui_events.send(EffectEvent::TutoUseSeed);
-            }
             seed_count.0 += 1;
         }
         turn.set(TurnState::CardPlayed).unwrap();
@@ -220,10 +213,15 @@ fn handle_turn_end(
     mut piles: Query<&mut Pile>,
     mut cmds: Commands,
     mut score_bonuses: ResMut<ScoreBonuses>,
+    mut score_update: EventWriter<ScoreEvent>,
 ) {
     use Participant::{Oppo, Player};
 
     let war_pile: Vec<_> = played_cards.iter().collect();
+
+    let mut send_score_update = |who, score| {
+        score_update.send(ScoreEvent::Add(who, score));
+    };
 
     let mut add_card_to_pile = |entity, bonus, who: Participant| {
         let is_war = |p: &Mut<Pile>| p.which == PileType::War;
@@ -235,6 +233,7 @@ fn handle_turn_end(
             .remove::<PlayedCard>();
         piles.iter_mut().find(is_war).unwrap().remove(entity);
         score_bonuses.add_to_owner(who, bonus);
+        bonus
     };
     match war_pile[..] {
         [card1, card2] => {
@@ -244,16 +243,22 @@ fn handle_turn_end(
             screen_print!(sec: 2, "player: {player_bonus}, oppo: {oppo_bonus}");
             match player.1.beats(oppo.1) {
                 BattleOutcome::Tie => {
-                    add_card_to_pile(player.2, player_bonus, Player);
-                    add_card_to_pile(oppo.2, oppo_bonus, Oppo);
+                    let p1_bonus = add_card_to_pile(player.2, player_bonus, Player);
+                    let p2_bonus = add_card_to_pile(oppo.2, oppo_bonus, Oppo);
+                    send_score_update(Player, p1_bonus + player.1.value_i32());
+                    send_score_update(Oppo, p2_bonus + oppo.1.value_i32());
                 }
                 BattleOutcome::Loss => {
-                    add_card_to_pile(player.2, player_bonus, Oppo);
-                    add_card_to_pile(oppo.2, oppo_bonus, Oppo);
+                    let p1_bonus = add_card_to_pile(player.2, player_bonus, Oppo);
+                    let p2_bonus = add_card_to_pile(oppo.2, oppo_bonus, Oppo);
+                    let cards_value = player.1.value_i32() + oppo.1.value_i32();
+                    send_score_update(Oppo, p1_bonus + p2_bonus + cards_value);
                 }
                 BattleOutcome::Win => {
-                    add_card_to_pile(player.2, player_bonus, Player);
-                    add_card_to_pile(oppo.2, oppo_bonus, Player);
+                    let p1_bonus = add_card_to_pile(player.2, player_bonus, Player);
+                    let p2_bonus = add_card_to_pile(oppo.2, oppo_bonus, Player);
+                    let cards_value = player.1.value_i32() + oppo.1.value_i32();
+                    send_score_update(Player, p1_bonus + p2_bonus + cards_value);
                 }
             }
         }

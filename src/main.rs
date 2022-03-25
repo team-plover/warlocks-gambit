@@ -14,6 +14,7 @@ mod cheat;
 mod deck;
 mod game_flow;
 mod game_ui;
+mod numbers;
 mod oppo_hand;
 mod pile;
 mod player_hand;
@@ -30,6 +31,14 @@ pub enum Participant {
     Player,
     Oppo,
 }
+impl Participant {
+    pub fn color(&self) -> Color {
+        match self {
+            Participant::Player => Color::rgb_u8(77, 77, 208),
+            Participant::Oppo => Color::RED,
+        }
+    }
+}
 
 /// Event to trigger a game over.
 #[derive(Debug)]
@@ -42,10 +51,6 @@ pub enum EndReason {
     Loss,
     CaughtCheating,
 }
-
-/// How many times did the game get started?
-#[derive(Default)]
-pub struct GameStarts(pub u32);
 
 #[derive(Component)]
 pub struct CardOrigin(pub Participant);
@@ -77,7 +82,7 @@ fn main() {
         });
 
     app.insert_resource(ClearColor(Color::rgb(0.293, 0.3828, 0.4023)))
-        .init_resource::<GameStarts>()
+        .add_plugin(numbers::Plugin)
         .add_plugin(bevy_debug_text_overlay::OverlayPlugin::default())
         .add_plugin(player_hand::Plugin(GameState::Playing))
         .add_plugin(oppo_hand::Plugin(GameState::Playing))
@@ -147,14 +152,6 @@ fn setup_load_screen(
     }
 }
 
-fn first_draw(
-    mut starts: ResMut<GameStarts>,
-    mut game_msgs: EventWriter<game_ui::EffectEvent>,
-    mut state: ResMut<State<TurnState>>,
-) {
-    if starts.0 == 1 {
-        game_msgs.send(game_ui::EffectEvent::TutoGetSeed);
-    }
-    starts.0 += 1;
+fn first_draw(mut state: ResMut<State<TurnState>>) {
     state.set(TurnState::Draw).unwrap();
 }

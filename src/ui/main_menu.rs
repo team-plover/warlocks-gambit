@@ -15,6 +15,9 @@ use crate::{
 struct MovingSlider;
 
 #[derive(Component, Clone)]
+struct RulesOverlay;
+
+#[derive(Component, Clone)]
 struct CreditOverlay;
 
 #[derive(Clone, Component)]
@@ -25,6 +28,7 @@ enum MainMenuElem {
     Start,
     Exit,
     Credits,
+    Rules,
     LockMouse,
     ToggleFullScreen,
     Set16_9,
@@ -94,6 +98,7 @@ fn update_menu(
     mut audio_requests: EventWriter<AudioRequest>,
     mut windows: ResMut<Windows>,
     mut credit_overlay: Query<&mut Style, With<CreditOverlay>>,
+    mut rules_overlay: Query<&mut Style, (Without<CreditOverlay>, With<RulesOverlay>)>,
     mut game_state: ResMut<State<GameState>>,
     elems: Query<(&Node, &GlobalTransform, &MainMenuElem)>,
 ) {
@@ -110,6 +115,10 @@ fn update_menu(
             NavEvent::Locked(from) => {
                 if matches!(elems.get(*from), Ok((_, _, MainMenuElem::Credits))) {
                     let mut style = credit_overlay.single_mut();
+                    style.display = Display::Flex;
+                }
+                if matches!(elems.get(*from), Ok((_, _, MainMenuElem::Rules))) {
+                    let mut style = rules_overlay.single_mut();
                     style.display = Display::Flex;
                 }
             }
@@ -152,8 +161,9 @@ fn update_menu(
     }
 }
 
-fn leave_credits(
-    mut credit_overlay: Query<&mut Style, With<CreditOverlay>>,
+#[allow(clippy::type_complexity)]
+fn leave_overlay(
+    mut overlay: Query<&mut Style, Or<(With<CreditOverlay>, With<RulesOverlay>)>>,
     mut nav_requests: EventWriter<NavRequest>,
     gamepad: Res<Input<GamepadButton>>,
     mouse: Res<Input<MouseButton>>,
@@ -163,10 +173,11 @@ fn leave_credits(
         || mouse.get_just_pressed().len() != 0
         || keyboard.get_just_pressed().len() != 0
     {
-        let mut style = credit_overlay.single_mut();
-        if style.display == Display::Flex {
-            style.display = Display::None;
-            nav_requests.send(NavRequest::Free)
+        for mut style in overlay.iter_mut() {
+            if style.display == Display::Flex {
+                style.display = Display::None;
+                nav_requests.send(NavRequest::Free)
+            }
         }
     }
 }
@@ -246,10 +257,11 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
             ],
             node{ flex_direction: FD::Row }[; Name::new("Menu columns")](
                 node[; Name::new("Menu node")](
-                    node[large_text("Start"); Focusable::new().dormant(), Name::new("Start button"), Start],
-                    node[large_text("Credits"); Focusable::lock(), Name::new("Credits button"), Credits],
+                    node[large_text("Start"); Focusable::new().dormant(), Name::new("Start"), Start],
+                    node[large_text("Credits"); Focusable::lock(), Name::new("Credits"), Credits],
+                    node[large_text("How to play"); Focusable::lock(), Name::new("Rules"), Rules],
                     if (!cfg!(target_arch = "wasm32")) {
-                        node[large_text("Exit"); focusable, Name::new("Exit button"), Exit]
+                        node[large_text("Exit"); focusable, Name::new("Exit"), Exit]
                     },
                 ),
                 node{ align_items: AlignItems::FlexEnd, margin: rect!(50 px) }[; Name::new("Audio settings")](
@@ -264,6 +276,26 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
                     },
                     node[large_text("Toggle Full screen"); focusable, ToggleFullScreen],
                 )
+            ),
+            node{
+                position_type: PT::Absolute,
+                position: rect!(10 pct),
+                display: Display::None,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center
+            }[; UiColor(Color::rgb(0.1, 0.1, 0.1)), Name::new("Rules overlay"), RulesOverlay](
+                node[large_text("Turns");],
+                node[text_bundle("The game is like War, but in turns, each player plays the", 30.0);],
+                node[text_bundle("first card. The one with the most point at the end wins.", 30.0);],
+                node[large_text("Effects");],
+                node[text_bundle("Cards may have special effects, hover over it to see", 30.0);],
+                node[text_bundle("what they do.", 30.0);],
+                node[large_text("Cheating");],
+                node[text_bundle("Drag a card toward your sleeve to store it.", 30.0);],
+                node[text_bundle("Cards stored in your sleeve return to your", 30.0);],
+                node[text_bundle("hand next time players draw cards, this replaces", 30.0);],
+                node[text_bundle("the card you would have otherwise drawn", 30.0);],
+                node[text_bundle("from the deck.", 30.0);],
             ),
             node{
                 position_type: PT::Absolute,
@@ -299,7 +331,7 @@ impl BevyPlugin for Plugin {
             .add_system_set(
                 SystemSet::on_update(self.0)
                     .with_system(update_sliders.before(NavRequestSystem))
-                    .with_system(leave_credits.before(NavRequestSystem))
+                    .with_system(leave_overlay.before(NavRequestSystem))
                     .with_system(update_menu.after(NavRequestSystem)),
             );
     }

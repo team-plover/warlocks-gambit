@@ -1,7 +1,7 @@
 use super::common::{MenuCursor, UiAssets};
 use bevy::app::AppExit;
 use bevy::prelude::*;
-use bevy_ui_build_macros::{build_ui, size, style, unit};
+use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
 use bevy_ui_navigation::{Focusable, NavEvent, NavRequest};
 
 use crate::{cleanup_marked, state::GameState, EndReason, GameOver};
@@ -23,6 +23,7 @@ impl FromWorld for RestartAssets {
 
 #[derive(Component, Clone)]
 enum Button {
+    MainMenu,
     Restart,
     ExitApp,
 }
@@ -37,14 +38,14 @@ fn handle_gameover_event(
     mut state: ResMut<State<GameState>>,
     mut events: EventReader<GameOver>,
 ) {
-    use self::Button::{ExitApp, Restart};
+    use self::Button::{ExitApp, MainMenu, Restart};
     use EndReason::{CaughtCheating, Loss, Victory};
     if let Some(GameOver(reason)) = events.iter().next() {
         state.set(GameState::RestartMenu).unwrap();
         let continue_text = match *reason {
-            Victory => "Congratulation! Replay?",
-            Loss => "You couldn't make up the point difference! Try again?",
-            CaughtCheating => "You got caught cheating! Try again?",
+            Victory => "Congratulation! You won!",
+            Loss => "You couldn't make up the point difference!",
+            CaughtCheating => "The BIRD saw you cheating!",
         };
         let won = matches!(*reason, Victory);
         let image = if won { &assets.victory } else { &assets.defeat };
@@ -62,6 +63,7 @@ fn handle_gameover_event(
 
         let focusable = Focusable::default();
         let cursor = MenuCursor::spawn_ui_element(&mut commands);
+        let defeat_hint = "Having difficulties? The game rules are in the main menu.";
         build_ui! {
             #[cmd(commands)]
             node{ size: size!(100 pct, 100 pct) }[;Name::new("Restart Menu root"), RestartMenuRoot](
@@ -73,7 +75,17 @@ fn handle_gameover_event(
                 ],
                 node[; Name::new("Menu columns")](
                     entity[image; style! { size: size!(auto, 45 pct), }],
-                    entity[ui_assets.large_text(continue_text);],
+                    entity[
+                        ui_assets.large_text(continue_text);
+                        style! { margin: rect!(0 px, 0 px, 0 px, 60 px,), }
+                    ],
+                    if (matches!(*reason, Loss | CaughtCheating)) {
+                        entity[
+                            ui_assets.text_bundle(defeat_hint, 30.0);
+                            style! { margin: rect!(0 px, 0 px, 0 px, 30 px,), }
+                        ]
+                    },
+                    entity[ui_assets.large_text("Main menu"); focusable, MainMenu],
                     if (cfg!(target_arch = "wasm32")) {
                         entity[ui_assets.large_text("(Press space to restart)");]
                     } else {
@@ -97,7 +109,8 @@ fn update(
             match buttons.get(*from.first()) {
                 Ok(Button::Restart) => state.set(GameState::Playing).unwrap(),
                 Ok(Button::ExitApp) => app_exit.send(AppExit),
-                _ => (),
+                Ok(Button::MainMenu) => state.set(GameState::MainMenu).unwrap(),
+                Err(_) => (),
             }
         }
     }
