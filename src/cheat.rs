@@ -43,8 +43,14 @@ impl Default for BirdEye {
     }
 }
 
-fn cleanup(mut bird_eye: ResMut<BirdEye>) {
+fn cleanup(
+    mut bird_eye: ResMut<BirdEye>,
+    mut bird_eye_anim: Query<&mut Animated, With<BirdPupilRoot>>,
+) {
     *bird_eye = BirdEye::default();
+    if let Ok(mut bird_eye_anim) = bird_eye_anim.get_single_mut() {
+        *bird_eye_anim = Animated::Static;
+    }
 }
 
 fn use_seed(
