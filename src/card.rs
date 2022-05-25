@@ -210,9 +210,9 @@ impl FromWorld for CardAssets {
         let mut card_mesh = Mesh::new(PrimitiveTopology::TriangleList);
         let card_pos: Vec<[f32; 3]> = CARD_VERTICES.iter().map(|&[x, y]| [x, y, 0.0]).collect();
         let card_uvs: Vec<[f32; 2]> = CARD_VERTICES.iter().map(uv_map).collect();
-        card_mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, Float32x3(card_pos));
-        card_mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, Float32x2(card_uvs));
-        card_mesh.set_attribute(
+        card_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, Float32x3(card_pos));
+        card_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, Float32x2(card_uvs));
+        card_mesh.insert_attribute(
             Mesh::ATTRIBUTE_NORMAL,
             Float32x3([[0.0, 0.0, 1.0]; 12].into()),
         );

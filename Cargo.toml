@@ -1,6 +1,6 @@
 [package]
 name = "warlocks-gambit"
-version = "1.4.0"
+version = "1.5.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -12,11 +12,11 @@ default = ["dynamic", "debug"]
 
 [dependencies]
 anyhow = "1"
-bevy-debug-text-overlay = { version = "1.0", default-features = false, features = ["builtin-font"] }
-bevy-scene-hook = "1.2"
-bevy_kira_audio = "0.8"
-bevy-ui-navigation = "0.14"
-bevy = { version = "0.6", default-features = false, features = [
+bevy-debug-text-overlay = { version = "2.0", default-features = false, features = ["builtin-font"] }
+bevy-scene-hook = "2.0"
+bevy_kira_audio = "0.10"
+bevy-ui-navigation = "0.16"
+bevy = { version = "0.7", default-features = false, features = [
     "bevy_winit",
     "render",
     "png",
@@ -24,9 +24,9 @@ bevy = { version = "0.6", default-features = false, features = [
     "x11",
 ] }
 bevy-ui-build-macros = "0.3.0"
-bevy-inspector-egui = { version = "0.8", optional = true }
+bevy-inspector-egui = { version = "0.11", optional = true }
 enum-map = "2"
-bevy_mod_raycast = "0.3"
+bevy_mod_raycast = "0.4"
 fastrand = "1.7"
 
 [profile.dev.package."*"]
@@ -36,4 +36,4 @@ opt-level = 1
 codegen-units = 1
 # According to some video I saw, -O3 is not significantly better than -O2
 opt-level = 2
-lto = "fat"
+lto = "thin"

@@ -66,8 +66,9 @@ fn main() {
     app.insert_resource(Msaa { samples: 4 })
         .insert_resource(WindowDescriptor {
             #[cfg(target_os = "linux")]
-            vsync: false, // workaround for https://github.com/bevyengine/bevy/issues/1908 (seems to be Mesa bug with X11 + Vulkan)
-            ..Default::default()
+            // workaround for https://github.com/bevyengine/bevy/issues/1908 (seems to be Mesa bug with X11 + Vulkan)
+            present_mode: bevy::window::PresentMode::Immediate, 
+            ..default()
         })
         .add_state(GameState::MainMenu)
         .add_state(TurnState::Starting)
@@ -76,9 +77,9 @@ fn main() {
     #[cfg(feature = "debug")]
     app.add_plugin(bevy_inspector_egui::WorldInspectorPlugin::new())
         .add_plugin(bevy::pbr::wireframe::WireframePlugin)
-        .insert_resource(bevy::render::options::WgpuOptions {
+        .insert_resource(bevy::render::settings::WgpuSettings {
             features: bevy::render::render_resource::WgpuFeatures::POLYGON_MODE_LINE,
-            ..Default::default()
+            ..default()
         });
 
     app.insert_resource(ClearColor(Color::rgb(0.293, 0.3828, 0.4023)))

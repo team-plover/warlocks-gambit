@@ -102,10 +102,10 @@ impl FromWorld for CardCollisionAssets {
         };
         let pos: Vec<[f32; 3]> = AREA_VERTICES.iter().map(|&[x, y]| [x, y, 0.0]).collect();
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, Float32x3(pos));
+        mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, Float32x3(pos));
         mesh.set_indices(Some(Indices::U16(AREA_EDGES.into())));
-        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, Float32x2([[0., 0.]; 9].into()));
-        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, Float32x3([[0., 0., 1.]; 9].into()));
+        mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, Float32x2([[0., 0.]; 9].into()));
+        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, Float32x3([[0., 0., 1.]; 9].into()));
         let mut meshes = world.get_resource_mut::<Assets<Mesh>>().unwrap();
         Self {
             bounding_box: meshes.add(shape::Quad::new(Vec2::new(2.3, 3.3)).into()),

@@ -3,10 +3,13 @@
 //! Defines an [`AudioRequest`] event, reads them in [`play_audio`] system
 //! using the kira backend for mixing and loudness controls.
 use bevy::prelude::{Plugin as BevyPlugin, *};
-use bevy_kira_audio::{Audio, AudioChannel as KiraChannel, AudioPlugin, AudioSource};
+use bevy_kira_audio::{AudioApp, AudioChannel as KiraChannel, AudioPlugin, AudioSource};
 use enum_map::{enum_map, EnumMap};
 
 use crate::war::WordOfPower;
+
+#[derive(SystemLabel, Debug, Clone, Hash, PartialEq, Eq)]
+pub struct AudioRequestSystem;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum AudioChannel {
@@ -19,18 +22,9 @@ struct ChannelVolumes {
     sfx: f32,
     music: f32,
 }
-struct AudioChannels {
-    sfx: KiraChannel,
-    music: KiraChannel,
-    volumes: ChannelVolumes,
-}
-impl Default for AudioChannels {
+impl Default for ChannelVolumes {
     fn default() -> Self {
-        Self {
-            sfx: KiraChannel::new("sfx".to_owned()),
-            music: KiraChannel::new("music".to_owned()),
-            volumes: ChannelVolumes { master: 1.0, sfx: 0.5, music: 0.5 },
-        }
+        Self { master: 1.0, sfx: 0.5, music: 0.5 }
     }
 }
 
@@ -54,6 +48,9 @@ impl FromWorld for AudioAssets {
     }
 }
 
+enum Music {}
+enum Sfx {}
+
 pub enum SfxParam {
     StartLoop,
     PlayOnce,
@@ -65,53 +62,52 @@ pub enum AudioRequest {
     PlayShuffleLong,
     PlayShuffleShort,
     StartMusic,
-    SetChannelVolume(AudioChannel, f32),
+    SetVolume(AudioChannel, f32),
 }
 fn play_audio(
     assets: Res<AudioAssets>,
-    audio: Res<Audio>,
-    mut channels: ResMut<AudioChannels>,
+    music: Res<KiraChannel<Music>>,
+    sfx: Res<KiraChannel<Sfx>>,
+    mut volumes: ResMut<ChannelVolumes>,
     mut events: EventReader<AudioRequest>,
 ) {
     for event in events.iter() {
         match event {
             AudioRequest::StartMusic => {
-                audio.play_looped_in_channel(assets.music.clone(), &channels.music);
+                music.play_looped(assets.music.clone_weak());
             }
-            AudioRequest::SetChannelVolume(AudioChannel::Sfx, volume) => {
-                channels.volumes.sfx = *volume;
-                let master = channels.volumes.master;
-                audio.set_volume_in_channel(volume * master, &channels.sfx);
+            AudioRequest::SetVolume(AudioChannel::Sfx, volume) if *volume != volumes.sfx => {
+                volumes.sfx = *volume;
+                sfx.set_volume(volume * volumes.master);
             }
-            AudioRequest::SetChannelVolume(AudioChannel::Music, volume) => {
-                channels.volumes.music = *volume;
-                let master = channels.volumes.master;
-                audio.set_volume_in_channel(volume * master, &channels.music);
+            AudioRequest::SetVolume(AudioChannel::Music, volume) if *volume != volumes.music => {
+                volumes.music = *volume;
+                music.set_volume(volume * volumes.master);
             }
-            AudioRequest::SetChannelVolume(AudioChannel::Master, volume) => {
-                channels.volumes.master = *volume;
-                let music_volume = volume * channels.volumes.music;
-                let sfx_volume = volume * channels.volumes.sfx;
-                audio.set_volume_in_channel(music_volume, &channels.music);
-                audio.set_volume_in_channel(sfx_volume, &channels.sfx);
+            AudioRequest::SetVolume(AudioChannel::Master, volume) if *volume != volumes.master => {
+                volumes.master = *volume;
+                music.set_volume(volume * volumes.music);
+                sfx.set_volume(volume * volumes.sfx);
             }
+            // Volume is equal to what it is requested to be changed to
+            AudioRequest::SetVolume(_, _) => {}
             AudioRequest::StopSfxLoop => {
-                audio.stop_channel(&channels.sfx);
+                sfx.stop();
             }
             AudioRequest::PlayWoodClink(SfxParam::StartLoop) => {
-                audio.play_looped_in_channel(assets.wood_clink.clone(), &channels.sfx);
+                sfx.play_looped(assets.wood_clink.clone_weak());
             }
             AudioRequest::PlayWoodClink(SfxParam::PlayOnce) => {
-                audio.play_in_channel(assets.wood_clink.clone(), &channels.sfx);
+                sfx.play(assets.wood_clink.clone_weak());
             }
             AudioRequest::PlayWord(word) => {
-                audio.play_in_channel(assets.words[*word].clone(), &channels.sfx);
+                sfx.play(assets.words[*word].clone_weak());
             }
             AudioRequest::PlayShuffleShort => {
-                audio.play_in_channel(assets.shuffle_short.clone(), &channels.sfx);
+                sfx.play(assets.shuffle_short.clone_weak());
             }
             AudioRequest::PlayShuffleLong => {
-                audio.play_in_channel(assets.shuffle_long.clone(), &channels.sfx);
+                sfx.play(assets.shuffle_long.clone_weak());
             }
         }
     }
@@ -121,9 +117,11 @@ pub struct Plugin;
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(AudioPlugin)
-            .init_resource::<AudioChannels>()
+            .init_resource::<ChannelVolumes>()
             .init_resource::<AudioAssets>()
             .add_event::<AudioRequest>()
-            .add_system(play_audio);
+            .add_audio_channel::<Music>()
+            .add_audio_channel::<Sfx>()
+            .add_system(play_audio.label(AudioRequestSystem));
     }
 }

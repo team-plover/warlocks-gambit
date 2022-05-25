@@ -6,7 +6,7 @@ use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
 use bevy_ui_navigation::{Focusable, Focused, NavEvent, NavRequest, NavRequestSystem};
 
 use crate::{
-    audio::{AudioChannel, AudioRequest, SfxParam},
+    audio::{AudioChannel, AudioRequest, AudioRequestSystem, SfxParam},
     cleanup_marked,
     state::GameState,
 };
@@ -71,7 +71,7 @@ fn update_sliders(
             let horizontal_delta: f32 = mouse_motion.iter().map(|m| m.delta.x).sum();
             let new_left = (left / 0.9 + horizontal_delta * 0.40).min(100.0).max(0.0);
             *strength = new_left;
-            audio_requests.send(AudioRequest::SetChannelVolume(*channel, new_left / 100.0));
+            audio_requests.send(AudioRequest::SetVolume(*channel, new_left / 100.0));
             style.position.left = Val::Percent(new_left * 0.9)
         };
         if mouse_buttons.just_released(MouseButton::Left) {
@@ -330,7 +330,11 @@ impl BevyPlugin for Plugin {
             .add_system_set(self.0.on_exit(cleanup_marked::<MainMenuRoot>))
             .add_system_set(
                 SystemSet::on_update(self.0)
-                    .with_system(update_sliders.before(NavRequestSystem))
+                    .with_system(
+                        update_sliders
+                            .before(NavRequestSystem)
+                            .before(AudioRequestSystem),
+                    )
                     .with_system(leave_overlay.before(NavRequestSystem))
                     .with_system(update_menu.after(NavRequestSystem)),
             );
