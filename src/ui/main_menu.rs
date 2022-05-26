@@ -3,7 +3,10 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy::{app::AppExit, input::mouse::MouseMotion, window::WindowMode};
 use bevy_debug_text_overlay::screen_print;
 use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
-use bevy_ui_navigation::{Focusable, Focused, NavEvent, NavRequest, NavRequestSystem};
+use bevy_ui_navigation::{
+    event_helpers::{NavEventReader, NavEventType},
+    Focusable, Focused, NavRequest, NavRequestSystem,
+};
 
 use crate::{
     audio::{AudioChannel, AudioRequest, AudioRequestSystem, SfxParam},
@@ -92,7 +95,7 @@ fn update_sliders(
 }
 
 fn update_menu(
-    mut events: EventReader<NavEvent>,
+    mut events: NavEventReader,
     mut exit: EventWriter<AppExit>,
     mut cmds: Commands,
     mut audio_requests: EventWriter<AudioRequest>,
@@ -100,61 +103,54 @@ fn update_menu(
     mut credit_overlay: Query<&mut Style, With<CreditOverlay>>,
     mut rules_overlay: Query<&mut Style, (Without<CreditOverlay>, With<RulesOverlay>)>,
     mut game_state: ResMut<State<GameState>>,
-    elems: Query<(&Node, &GlobalTransform, &MainMenuElem)>,
+    elems: Query<&MainMenuElem>,
 ) {
+    use NavEventType::{FocusChanged, Locked, NoChanges};
     let window_msg = "There is at least one game window open";
-    for nav_event in events.iter() {
-        match nav_event {
-            NavEvent::FocusChanged { from, .. } => {
-                let from = *from.first();
-                let (_, _, from_elem) = elems.get(from).unwrap();
-                if matches!(from_elem, MainMenuElem::AudioSlider(..)) {
-                    cmds.entity(from).remove::<MovingSlider>();
+    for (event_type, from) in events.type_iter() {
+        match (event_type, elems.get(from)) {
+            (FocusChanged, Ok(MainMenuElem::AudioSlider(..))) => {
+                cmds.entity(from).remove::<MovingSlider>();
+            }
+            (Locked, Ok(MainMenuElem::Credits)) => {
+                let mut style = credit_overlay.single_mut();
+                style.display = Display::Flex;
+            }
+            (Locked, Ok(MainMenuElem::Rules)) => {
+                let mut style = rules_overlay.single_mut();
+                style.display = Display::Flex;
+            }
+            (NoChanges(NavRequest::Action), Ok(MainMenuElem::Exit)) => exit.send(AppExit),
+            (NoChanges(NavRequest::Action), Ok(MainMenuElem::Start)) => {
+                screen_print!("Player pressed the start button");
+                audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
+                game_state.set(GameState::WaitLoaded).unwrap();
+            }
+            (NoChanges(NavRequest::Action), Ok(MainMenuElem::LockMouse)) => {
+                let window = windows.get_primary_mut().expect(window_msg);
+                let prev_lock_mode = window.cursor_locked();
+                window.set_cursor_lock_mode(!prev_lock_mode);
+            }
+            (NoChanges(NavRequest::Action), Ok(MainMenuElem::ToggleFullScreen)) => {
+                use WindowMode::*;
+                let window = windows.get_primary_mut().expect(window_msg);
+                let new_mode = if window.mode() == BorderlessFullscreen {
+                    Windowed
+                } else {
+                    BorderlessFullscreen
+                };
+                window.set_mode(new_mode);
+            }
+            (NoChanges(NavRequest::Action), Ok(MainMenuElem::Set16_9)) => {
+                let window = windows.get_primary_mut().expect(window_msg);
+                if window.mode() == WindowMode::Windowed {
+                    let height = window.height();
+                    window.set_resolution(height * 16.0 / 9.0, height);
                 }
             }
-            NavEvent::Locked(from) => {
-                if matches!(elems.get(*from), Ok((_, _, MainMenuElem::Credits))) {
-                    let mut style = credit_overlay.single_mut();
-                    style.display = Display::Flex;
-                }
-                if matches!(elems.get(*from), Ok((_, _, MainMenuElem::Rules))) {
-                    let mut style = rules_overlay.single_mut();
-                    style.display = Display::Flex;
-                }
-            }
-            NavEvent::NoChanges { from, request: NavRequest::Action } => {
-                match elems.get(*from.first()).map(|t| t.2) {
-                    Ok(MainMenuElem::Exit) => exit.send(AppExit),
-                    Ok(MainMenuElem::Start) => {
-                        screen_print!("Player pressed the start button");
-                        audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
-                        game_state.set(GameState::WaitLoaded).unwrap();
-                    }
-                    Ok(MainMenuElem::LockMouse) => {
-                        let window = windows.get_primary_mut().expect(window_msg);
-                        let prev_lock_mode = window.cursor_locked();
-                        window.set_cursor_lock_mode(!prev_lock_mode);
-                    }
-                    Ok(MainMenuElem::ToggleFullScreen) => {
-                        use WindowMode::*;
-                        let window = windows.get_primary_mut().expect(window_msg);
-                        let prev_mode = window.mode();
-                        let new_mode = if prev_mode == BorderlessFullscreen {
-                            Windowed
-                        } else {
-                            BorderlessFullscreen
-                        };
-                        window.set_mode(new_mode);
-                    }
-                    Ok(MainMenuElem::Set16_9) => {
-                        let window = windows.get_primary_mut().expect(window_msg);
-                        if window.mode() == WindowMode::Windowed {
-                            let height = window.height();
-                            window.set_resolution(height * 16.0 / 9.0, height);
-                        }
-                    }
-                    _ => {}
-                }
+            (NavEventType::Unlocked, _) => {}
+            (_, Err(err)) => {
+                println!("error in main_menu update: {err:?}");
             }
             _ => {}
         }

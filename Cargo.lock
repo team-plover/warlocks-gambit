@@ -276,9 +276,9 @@ checksum = "af2c9d57d6b6500b3aa8744877ad54bcc01b0265d9a03b0aa3a981b06423e403"
 
 [[package]]
 name = "bevy-ui-navigation"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f430151becddaa2fec9f08f1767b2b2162890e711c3674390708f6724b524ed0"
+checksum = "44d2f0b21b8b7d6ce0b2f4b6495edc9b5a079b678a9717d41ddf2aaeb91e51a3"
 dependencies = [
  "bevy",
  "non-empty-vec",

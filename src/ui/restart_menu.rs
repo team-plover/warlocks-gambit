@@ -2,7 +2,7 @@ use super::common::{MenuCursor, UiAssets};
 use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
-use bevy_ui_navigation::{Focusable, NavEvent, NavRequest};
+use bevy_ui_navigation::{event_helpers::NavEventQuery, Focusable};
 
 use crate::{cleanup_marked, state::GameState, EndReason, GameOver};
 
@@ -99,20 +99,15 @@ fn handle_gameover_event(
 }
 
 fn update(
-    mut nav_events: EventReader<NavEvent>,
+    mut nav_events: NavEventQuery<&Button>,
     mut state: ResMut<State<GameState>>,
     mut app_exit: EventWriter<AppExit>,
-    buttons: Query<&Button>,
 ) {
-    for event in nav_events.iter() {
-        if let NavEvent::NoChanges { from, request: NavRequest::Action } = event {
-            match buttons.get(*from.first()) {
-                Ok(Button::Restart) => state.set(GameState::Playing).unwrap(),
-                Ok(Button::ExitApp) => app_exit.send(AppExit),
-                Ok(Button::MainMenu) => state.set(GameState::MainMenu).unwrap(),
-                Err(_) => (),
-            }
-        }
+    match nav_events.single_activated().unwrap_opt() {
+        Some(Button::ExitApp) => app_exit.send(AppExit),
+        Some(Button::Restart) => state.set(GameState::Playing).unwrap(),
+        Some(Button::MainMenu) => state.set(GameState::MainMenu).unwrap(),
+        None => {}
     }
 }
 

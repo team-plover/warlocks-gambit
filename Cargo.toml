@@ -15,7 +15,7 @@ anyhow = "1"
 bevy-debug-text-overlay = { version = "2.0", default-features = false, features = ["builtin-font"] }
 bevy-scene-hook = "2.0"
 bevy_kira_audio = "0.10"
-bevy-ui-navigation = "0.16"
+bevy-ui-navigation = "0.17"
 bevy = { version = "0.7", default-features = false, features = [
     "bevy_winit",
     "render",
