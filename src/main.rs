@@ -25,6 +25,7 @@ mod ui;
 mod war;
 
 use state::{GameState, TurnState};
+use bevy_scene_hook::HookedSceneState;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Participant {
@@ -36,6 +37,12 @@ impl Participant {
         match self {
             Participant::Player => Color::rgb_u8(77, 77, 208),
             Participant::Oppo => Color::RED,
+        }
+    }
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Player => "Player",
+            Self::Oppo => "Oppo",
         }
     }
 }
@@ -84,6 +91,7 @@ fn main() {
 
     app.insert_resource(ClearColor(Color::rgb(0.293, 0.3828, 0.4023)))
         .add_plugin(numbers::Plugin)
+        .add_plugin(bevy_scene_hook::HookPlugin)
         .add_plugin(bevy_debug_text_overlay::OverlayPlugin::default())
         .add_plugin(player_hand::Plugin(GameState::Playing))
         .add_plugin(oppo_hand::Plugin(GameState::Playing))
@@ -124,19 +132,19 @@ fn setup(
 
 fn complete_load_screen(
     mut state: ResMut<State<GameState>>,
-    scene: Query<&bevy_scene_hook::SceneInstance<scene::Scene>>,
+    scene: HookedSceneState<scene::Graveyard>,
 ) {
-    if scene.single().is_loaded() {
+    if scene.is_loaded() {
         state.set(GameState::Playing).expect("no state issues");
     }
 }
 fn setup_load_screen(
     mut cmds: Commands,
     assets: Res<ui::Assets>,
-    scene: Query<&bevy_scene_hook::SceneInstance<scene::Scene>>,
+    scene: HookedSceneState<scene::Graveyard>,
 ) {
     use bevy_ui_build_macros::{build_ui, size, style, unit};
-    if !scene.single().is_loaded() {
+    if !scene.is_loaded() {
         let node = NodeBundle::default();
         build_ui! {
             #[cmd(cmds)]

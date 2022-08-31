@@ -3,18 +3,19 @@
 use std::f32::consts::TAU;
 
 use bevy::{
+    ecs::system::EntityCommands,
     math::EulerRot::XYZ,
     pbr::wireframe::Wireframe,
     prelude::{Plugin as BevyPlugin, *},
 };
 use bevy_mod_raycast::{RayCastMesh, RayCastSource};
-use bevy_scene_hook::{world::SceneHook as WorldSceneHook, SceneInstance};
+use bevy_scene_hook::{HookingSceneSpawner, HookPlugin};
 
 use crate::{
     animate::Animated,
     card::{OppoCardSpawner, PlayerCardSpawner},
     cheat::{BirdPupil, BirdPupilRoot, PlayerSleeve},
-    deck::{Deck, DeckAssets, OppoDeck, PlayerDeck},
+    deck::DeckAssets,
     game_ui::{OppoScore, PlayerScore},
     numbers::Number,
     oppo_hand::OppoHand,
@@ -23,32 +24,29 @@ use crate::{
     Participant,
 };
 
-pub enum Scene {}
-impl WorldSceneHook for Scene {
-    fn hook_named_node(name: Name, world: &mut World, entity: Entity) {
-        match name.as_str() {
-            "PlayerDeck" => {
-                let handle = world.get_resource::<DeckAssets>().unwrap().player.clone();
-                let assets = world.get_resource::<Assets<Deck>>().unwrap();
-                let deck = assets.get(handle).unwrap().clone();
-                world.entity_mut(entity).insert(PlayerDeck::new(deck));
-            }
-            "OppoDeck" => {
-                let handle = world.get_resource::<DeckAssets>().unwrap().oppo.clone();
-                let assets = world.get_resource::<Assets<Deck>>().unwrap();
-                let deck = assets.get(handle).unwrap().clone();
-                world.entity_mut(entity).insert(OppoDeck::new(deck));
-            }
-            "PlayerHand" => {
-                let mesh = world.get_resource::<CardCollisionAssets>().unwrap();
-                let mesh = mesh.circle.clone();
-                world.spawn().insert_bundle((
-                    mesh,
+#[derive(Component)]
+pub struct Graveyard;
+
+fn hook(
+    card_meshes: &CardCollisionAssets,
+    decks: &DeckAssets,
+    name: &str,
+    cmds: &mut EntityCommands,
+) {
+    use Participant::{Oppo, Player};
+    let participant = if name.starts_with("Oppo") { Oppo } else { Player };
+    match name {
+        "PlayerDeck" => cmds.insert(decks.player.clone_weak()),
+        "OppoDeck" => cmds.insert(decks.oppo.clone_weak()),
+        "PlayerHand" => cmds
+            .insert_bundle((PlayerHand, Animated::bob(2.0, 0.05, 7.0)))
+            .with_children(|cmds| {
+                cmds.spawn_bundle((
+                    card_meshes.circle.clone_weak(),
                     Wireframe,
                     RayCastMesh::<HandDisengageArea>::default(),
                     Visibility::default(),
                     ComputedVisibility::default(),
-                    Parent(entity),
                     GlobalTransform::default(),
                     Transform {
                         rotation: Quat::from_rotation_y(TAU / 2.),
@@ -56,99 +54,81 @@ impl WorldSceneHook for Scene {
                         translation: Vec3::ZERO,
                     },
                 ));
-            }
-            "PlayerSleeveStash" => {
-                let mesh = world.get_resource::<CardCollisionAssets>().unwrap();
-                let mesh = mesh.circle.clone();
-                world.spawn().insert_bundle((
-                    mesh,
-                    Wireframe,
-                    RayCastMesh::<SleeveArea>::default(),
-                    Visibility::default(),
-                    ComputedVisibility::default(),
-                    Parent(entity),
-                    GlobalTransform::default(),
-                    Transform {
-                        rotation: Quat::from_rotation_y(TAU / 2.),
-                        scale: Vec3::new(1., 0.7, 1.),
-                        translation: Vec3::new(0., 1.7, 0.2),
-                    },
-                ));
-            }
-            _ => {}
-        }
-        let mut cmds = world.entity_mut(entity);
-        match name.as_str() {
-            "PlayerPerspective_Orientation" => cmds.insert_bundle((
-                RayCastSource::<HandRaycast>::new(),
-                RayCastSource::<SleeveArea>::new(),
-                RayCastSource::<HandDisengageArea>::new(),
-            )),
-            "PlayerCardSpawn" => cmds.insert(PlayerCardSpawner),
-            "OppoCardSpawn" => cmds.insert(OppoCardSpawner),
-            "OppoHand" => cmds.insert_bundle((OppoHand, Animated::bob(1.0, 0.3, 6.0))),
-            "PlayerHand" => cmds.insert_bundle((PlayerHand, Animated::bob(2.0, 0.05, 7.0))),
-            "Pile" => cmds.insert(Pile::new(PileType::War)),
-            "OppoPile" => cmds
-                .insert(Pile::new(PileType::Oppo))
+            }),
+        "PlayerSleeveStash" => cmds.insert(PlayerSleeve).with_children(|cmds| {
+            cmds.spawn_bundle((
+                card_meshes.circle.clone_weak(),
+                Wireframe,
+                RayCastMesh::<SleeveArea>::default(),
+                Visibility::default(),
+                ComputedVisibility::default(),
+                GlobalTransform::default(),
+                Transform {
+                    rotation: Quat::from_rotation_y(TAU / 2.),
+                    scale: Vec3::new(1., 0.7, 1.),
+                    translation: Vec3::new(0., 1.7, 0.2),
+                },
+            ));
+        }),
+        "PlayerPerspective_Orientation" => cmds.insert_bundle((
+            RayCastSource::<HandRaycast>::new(),
+            RayCastSource::<SleeveArea>::new(),
+            RayCastSource::<HandDisengageArea>::new(),
+        )),
+        "PlayerCardSpawn" => cmds.insert(PlayerCardSpawner),
+        "OppoCardSpawn" => cmds.insert(OppoCardSpawner),
+        "OppoHand" => cmds.insert_bundle((OppoHand, Animated::bob(1.0, 0.3, 6.0))),
+        "Pile" => cmds.insert(Pile::new(PileType::War)),
+        "OppoPile" | "PlayerPile" => {
+            cmds.insert(Pile::new(participant.into()))
                 .with_children(|cmds| {
-                    cmds.spawn_bundle((
-                        Name::new("Oppo score"),
-                        OppoScore,
-                        Number::new(0, Participant::Oppo.color()),
-                        Transform {
-                            translation: Vec3::Z,
-                            rotation: Quat::from_euler(XYZ, TAU / 4., 0.5, 0.0),
-                            scale: Vec3::splat(0.3),
-                        },
-                        GlobalTransform::default(),
+                    let pile_rotation = match participant {
+                        Oppo => Quat::from_euler(XYZ, TAU / 4., 0.5, 0.0),
+                        Player => Quat::from_euler(XYZ, TAU / 4., -1.1, 0.0),
+                    };
+                    let transform = Transform {
+                        translation: Vec3::Z,
+                        rotation: pile_rotation,
+                        scale: Vec3::splat(0.3),
+                    };
+                    let mut cmds = cmds.spawn_bundle((
+                        Name::new(participant.name().to_owned() + " score"),
+                        Number::new(0, participant.color()),
                     ));
-                }),
-            "PlayerPile" => cmds
-                .insert(Pile::new(PileType::Player))
-                .with_children(|cmds| {
-                    cmds.spawn_bundle((
-                        Name::new("Player score"),
-                        PlayerScore,
-                        Number::new(0, Participant::Player.color()),
-                        Transform {
-                            translation: Vec3::Z,
-                            rotation: Quat::from_euler(XYZ, TAU / 4., -1.1, 0.0),
-                            scale: Vec3::splat(0.3),
-                        },
-                        GlobalTransform::default(),
-                    ));
-                }),
-            "ManBody" => cmds.insert(Animated::breath(0.0, 0.03, 6.0)),
-            "ManHead" => cmds.insert(Animated::bob(6. / 4., 0.1, 6.0)),
-            "Bird" => cmds.insert(Animated::breath(0.0, 0.075, 5.0)),
-            "BirdPupillaSprite" => cmds.insert(BirdPupil),
-            "BirdEyePupilla" => {
-                cmds.insert_bundle((BirdPupilRoot, Animated::bob(5. / 4., 0.02, 5.0)))
-            }
-            "PlayerSleeveStash" => cmds.insert(PlayerSleeve),
-            _ => &mut cmds,
-        };
-    }
-}
 
+                    match participant {
+                        Oppo => cmds.insert(OppoScore),
+                        Player => cmds.insert(PlayerScore),
+                    };
+                })
+        }
+        "ManBody" => cmds.insert(Animated::breath(0.0, 0.03, 6.0)),
+        "ManHead" => cmds.insert(Animated::bob(6. / 4., 0.1, 6.0)),
+        "Bird" => cmds.insert(Animated::breath(0.0, 0.075, 5.0)),
+        "BirdPupillaSprite" => cmds.insert(BirdPupil),
+        "BirdEyePupilla" => cmds.insert_bundle((BirdPupilRoot, Animated::bob(5. / 4., 0.02, 5.0))),
+        _ => cmds,
+    };
+}
 fn load_scene(
     mut cmds: Commands,
-    mut scene_spawner: ResMut<SceneSpawner>,
+    mut scene_spawner: HookingSceneSpawner,
+    card_meshes: Res<CardCollisionAssets>,
+    decks: Res<DeckAssets>,
     asset_server: Res<AssetServer>,
 ) {
-    let scene = scene_spawner.spawn(asset_server.load("scene.glb#Scene0"));
-    cmds.spawn().insert(SceneInstance::<Scene>::new(scene));
+    let card_meshes = card_meshes.clone();
+    let decks = decks.clone();
+    let result = scene_spawner.with_comp_hook(
+        asset_server.load("scene.glb#Scene0"),
+        move |name: &Name, cmds| hook(&card_meshes, &decks, name.as_str(), cmds),
+    );
+    cmds.entity(result).insert(Graveyard);
 }
 
 pub struct Plugin;
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
-        app.add_system(
-            Scene::hook
-                .exclusive_system()
-                .with_run_criteria(Scene::when_not_spawned),
-        )
-        .add_startup_system(load_scene);
+        app.add_startup_system(load_scene);
     }
 }

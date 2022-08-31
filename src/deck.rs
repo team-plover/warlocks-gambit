@@ -14,10 +14,10 @@ use bevy::{
 };
 #[cfg(feature = "debug")]
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
-use bevy_scene_hook::world::SceneHook;
+use bevy_scene_hook::is_scene_hooked;
 
 use crate::{
-    scene::Scene,
+    scene::Graveyard,
     state::GameState,
     war::{Card, ParseError},
 };
@@ -25,6 +25,14 @@ use crate::{
 pub struct DeckAssets {
     pub player: Handle<Deck>,
     pub oppo: Handle<Deck>,
+}
+impl Clone for DeckAssets {
+    fn clone(&self) -> Self {
+        Self {
+            player: self.player.clone_weak(),
+            oppo: self.oppo.clone_weak(),
+        }
+    }
 }
 impl FromWorld for DeckAssets {
     fn from_world(world: &mut World) -> Self {
@@ -97,12 +105,6 @@ macro_rules! impl_deck_methods {
             pub fn new(deck: Deck) -> Self {
                 Self(deck)
             }
-            pub fn reset(&mut self, handle: &Handle<Deck>, decks: &Assets<Deck>) {
-                self.0 = decks
-                    .get(handle.clone())
-                    .expect("Deck already loaded")
-                    .clone();
-            }
         }
     );
     (@method $name:ident (
@@ -159,29 +161,45 @@ fn update_meshes(
 }
 
 fn resize_decks(
-    player_parent: Query<(&Children, &PlayerDeck)>,
-    oppo_parent: Query<(&Children, &OppoDeck)>,
+    player_parent: Query<(&Children, &PlayerDeck), Changed<PlayerDeck>>,
+    oppo_parent: Query<(&Children, &OppoDeck), Changed<OppoDeck>>,
     mut meshes_q: Query<(&Handle<Mesh>, &mut Visibility)>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    let (player, player_deck) = player_parent.single();
-    let (oppo, oppo_deck) = oppo_parent.single();
-    update_meshes(
-        (player_deck.remaining(), oppo_deck.remaining()),
-        (player[0], oppo[0]),
-        &mut meshes,
-        &mut meshes_q,
-    );
+    let decks = (player_parent.get_single(), oppo_parent.get_single());
+    if let (Ok((player, player_deck)), Ok((oppo, oppo_deck))) = decks {
+        update_meshes(
+            (player_deck.remaining(), oppo_deck.remaining()),
+            (player[0], oppo[0]),
+            &mut meshes,
+            &mut meshes_q,
+        );
+    }
 }
 
-fn reset_decks(
-    mut player: Query<&mut PlayerDeck>,
-    mut oppo: Query<&mut OppoDeck>,
+fn load_decks(
+    unloaded_decks: Query<(Entity, &Handle<Deck>, &Name), (Without<PlayerDeck>, Without<OppoDeck>)>,
+    mut cmds: Commands,
     decks: Res<Assets<Deck>>,
-    deck_handles: Res<DeckAssets>,
 ) {
-    player.single_mut().reset(&deck_handles.player, &decks);
-    oppo.single_mut().reset(&deck_handles.oppo, &decks);
+    for (to_load, handle, name) in unloaded_decks.iter() {
+        if let Some(deck) = decks.get(handle.clone_weak()) {
+            let mut cmds = cmds.entity(to_load);
+            match name.as_str() {
+                "PlayerDeck" => cmds.insert(PlayerDeck::new(deck.clone())),
+                "OppoDeck" => cmds.insert(OppoDeck::new(deck.clone())),
+                _ => &mut cmds,
+            };
+        }
+    }
+}
+
+fn reset_decks(decks: Query<Entity, Or<(With<PlayerDeck>, With<OppoDeck>)>>, mut cmds: Commands) {
+    for to_unload in decks.iter() {
+        cmds.entity(to_unload)
+            .remove::<PlayerDeck>()
+            .remove::<OppoDeck>();
+    }
 }
 
 pub struct Plugin(pub GameState);
@@ -195,7 +213,8 @@ impl BevyPlugin for Plugin {
         app.add_asset::<Deck>()
             .init_asset_loader::<DeckLoader>()
             .init_resource::<DeckAssets>()
-            .add_system(resize_decks.with_run_criteria(Scene::when_spawned))
-            .add_system_set(self.0.on_exit(reset_decks));
+            .add_system(resize_decks.with_run_criteria(is_scene_hooked::<Graveyard>))
+            .add_system(load_decks)
+            .add_system_set(self.0.on_exit(reset_decks.after(load_decks)));
     }
 }
