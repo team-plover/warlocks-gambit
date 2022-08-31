@@ -3,10 +3,7 @@ use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy::{app::AppExit, input::mouse::MouseMotion, window::WindowMode};
 use bevy_debug_text_overlay::screen_print;
 use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
-use bevy_ui_navigation::{
-    event_helpers::{NavEventReader, NavEventType},
-    Focusable, Focused, NavRequest, NavRequestSystem,
-};
+use bevy_ui_navigation::prelude::*;
 
 use crate::{
     audio::{AudioChannel, AudioRequest, AudioRequestSystem, SfxParam},
@@ -35,7 +32,7 @@ enum MainMenuElem {
     LockMouse,
     ToggleFullScreen,
     Set16_9,
-    AudioSlider(AudioChannel, f32),
+    AudioSlider(AudioChannel, f64),
 }
 
 pub struct MenuAssets {
@@ -71,15 +68,17 @@ fn update_sliders(
         if let (Val::Percent(left), AudioSlider(channel, strength)) =
             (style.position.left, elem.as_mut())
         {
-            let horizontal_delta: f32 = mouse_motion.iter().map(|m| m.delta.x).sum();
-            let new_left = (left / 0.9 + horizontal_delta * 0.40).min(100.0).max(0.0);
+            let horizontal_delta: f64 = mouse_motion.iter().map(|m| m.delta.x as f64).sum();
+            let new_left = (left as f64 / 0.9 + horizontal_delta * 0.40)
+                .min(100.0)
+                .max(0.0);
             *strength = new_left;
             audio_requests.send(AudioRequest::SetVolume(*channel, new_left / 100.0));
-            style.position.left = Val::Percent(new_left * 0.9)
+            style.position.left = Val::Percent(new_left as f32 * 0.9)
         };
         if mouse_buttons.just_released(MouseButton::Left) {
             mouse_buttons.clear_just_released(MouseButton::Left);
-            nav_requests.send(NavRequest::Free);
+            nav_requests.send(NavRequest::Unlock);
             audio_requests.send(AudioRequest::StopSfxLoop);
             cmds.entity(entity).remove::<MovingSlider>();
         }
@@ -95,7 +94,7 @@ fn update_sliders(
 }
 
 fn update_menu(
-    mut events: NavEventReader,
+    mut events: EventReader<NavEvent>,
     mut exit: EventWriter<AppExit>,
     mut cmds: Commands,
     mut audio_requests: EventWriter<AudioRequest>,
@@ -105,33 +104,34 @@ fn update_menu(
     mut game_state: ResMut<State<GameState>>,
     elems: Query<&MainMenuElem>,
 ) {
-    use NavEventType::{FocusChanged, Locked, NoChanges};
+    use NavEvent::{FocusChanged, Locked, NoChanges};
+    use NavRequest::Action;
     let window_msg = "There is at least one game window open";
-    for (event_type, from) in events.type_iter() {
+    for (event_type, from) in events.nav_iter().types() {
         match (event_type, elems.get(from)) {
-            (FocusChanged, Ok(MainMenuElem::AudioSlider(..))) => {
+            (FocusChanged { .. }, Ok(MainMenuElem::AudioSlider(..))) => {
                 cmds.entity(from).remove::<MovingSlider>();
             }
-            (Locked, Ok(MainMenuElem::Credits)) => {
+            (Locked(..), Ok(MainMenuElem::Credits)) => {
                 let mut style = credit_overlay.single_mut();
                 style.display = Display::Flex;
             }
-            (Locked, Ok(MainMenuElem::Rules)) => {
+            (Locked(..), Ok(MainMenuElem::Rules)) => {
                 let mut style = rules_overlay.single_mut();
                 style.display = Display::Flex;
             }
-            (NoChanges(NavRequest::Action), Ok(MainMenuElem::Exit)) => exit.send(AppExit),
-            (NoChanges(NavRequest::Action), Ok(MainMenuElem::Start)) => {
+            (NoChanges { request: Action, .. }, Ok(MainMenuElem::Exit)) => exit.send(AppExit),
+            (NoChanges { request: Action, .. }, Ok(MainMenuElem::Start)) => {
                 screen_print!("Player pressed the start button");
                 audio_requests.send(AudioRequest::PlayWoodClink(SfxParam::PlayOnce));
                 game_state.set(GameState::WaitLoaded).unwrap();
             }
-            (NoChanges(NavRequest::Action), Ok(MainMenuElem::LockMouse)) => {
+            (NoChanges { request: Action, .. }, Ok(MainMenuElem::LockMouse)) => {
                 let window = windows.get_primary_mut().expect(window_msg);
                 let prev_lock_mode = window.cursor_locked();
                 window.set_cursor_lock_mode(!prev_lock_mode);
             }
-            (NoChanges(NavRequest::Action), Ok(MainMenuElem::ToggleFullScreen)) => {
+            (NoChanges { request: Action, .. }, Ok(MainMenuElem::ToggleFullScreen)) => {
                 use WindowMode::*;
                 let window = windows.get_primary_mut().expect(window_msg);
                 let new_mode = if window.mode() == BorderlessFullscreen {
@@ -141,14 +141,14 @@ fn update_menu(
                 };
                 window.set_mode(new_mode);
             }
-            (NoChanges(NavRequest::Action), Ok(MainMenuElem::Set16_9)) => {
+            (NoChanges { request: Action, .. }, Ok(MainMenuElem::Set16_9)) => {
                 let window = windows.get_primary_mut().expect(window_msg);
                 if window.mode() == WindowMode::Windowed {
                     let height = window.height();
                     window.set_resolution(height * 16.0 / 9.0, height);
                 }
             }
-            (NavEventType::Unlocked, _) => {}
+            (NavEvent::Unlocked(..), _) => {}
             (_, Err(err)) => {
                 println!("error in main_menu update: {err:?}");
             }
@@ -172,7 +172,7 @@ fn leave_overlay(
         for mut style in overlay.iter_mut() {
             if style.display == Display::Flex {
                 style.display = Display::None;
-                nav_requests.send(NavRequest::Free)
+                nav_requests.send(NavRequest::Unlock)
             }
         }
     }
@@ -198,13 +198,13 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
         },
         ..Default::default()
     };
-    let mut slider = |name: &str, channel: AudioChannel, strength: f32| {
+    let mut slider = |name: &str, channel: AudioChannel, strength: f64| {
         let volume_name = name.to_string() + " volume";
         let handle_name = Name::new(name.to_string() + " volume slider handle");
         let slider_name = Name::new(name.to_string() + " volume slider");
-        let position = Rect {
+        let position = UiRect {
             bottom: Val::Px(-10.0),
-            left: Val::Percent(strength * 0.9),
+            left: Val::Percent(strength as f32 * 0.9),
             ..Default::default()
         };
         build_ui! {
@@ -253,7 +253,7 @@ fn setup_main_menu(mut cmds: Commands, menu_assets: Res<MenuAssets>, ui_assets: 
             ],
             node{ flex_direction: FD::Row }[; Name::new("Menu columns")](
                 node[; Name::new("Menu node")](
-                    node[large_text("Start"); Focusable::new().dormant(), Name::new("Start"), Start],
+                    node[large_text("Start"); Focusable::new().prioritized(), Name::new("Start"), Start],
                     node[large_text("Credits"); Focusable::lock(), Name::new("Credits"), Credits],
                     node[large_text("How to play"); Focusable::lock(), Name::new("Rules"), Rules],
                     if (!cfg!(target_arch = "wasm32")) {

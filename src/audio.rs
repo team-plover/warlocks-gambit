@@ -3,7 +3,7 @@
 //! Defines an [`AudioRequest`] event, reads them in [`play_audio`] system
 //! using the kira backend for mixing and loudness controls.
 use bevy::prelude::{Plugin as BevyPlugin, *};
-use bevy_kira_audio::{AudioApp, AudioChannel as KiraChannel, AudioPlugin, AudioSource};
+use bevy_kira_audio::prelude::{AudioChannel as KiraChannel, *};
 use enum_map::{enum_map, EnumMap};
 
 use crate::war::WordOfPower;
@@ -18,9 +18,9 @@ pub enum AudioChannel {
     Music,
 }
 struct ChannelVolumes {
-    master: f32,
-    sfx: f32,
-    music: f32,
+    master: f64,
+    sfx: f64,
+    music: f64,
 }
 impl Default for ChannelVolumes {
     fn default() -> Self {
@@ -62,7 +62,7 @@ pub enum AudioRequest {
     PlayShuffleLong,
     PlayShuffleShort,
     StartMusic,
-    SetVolume(AudioChannel, f32),
+    SetVolume(AudioChannel, f64),
 }
 fn play_audio(
     assets: Res<AudioAssets>,
@@ -74,7 +74,7 @@ fn play_audio(
     for event in events.iter() {
         match event {
             AudioRequest::StartMusic => {
-                music.play_looped(assets.music.clone_weak());
+                music.play(assets.music.clone_weak()).looped();
             }
             AudioRequest::SetVolume(AudioChannel::Sfx, volume) if *volume != volumes.sfx => {
                 volumes.sfx = *volume;
@@ -95,7 +95,7 @@ fn play_audio(
                 sfx.stop();
             }
             AudioRequest::PlayWoodClink(SfxParam::StartLoop) => {
-                sfx.play_looped(assets.wood_clink.clone_weak());
+                sfx.play(assets.wood_clink.clone_weak()).looped();
             }
             AudioRequest::PlayWoodClink(SfxParam::PlayOnce) => {
                 sfx.play(assets.wood_clink.clone_weak());

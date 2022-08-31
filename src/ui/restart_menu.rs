@@ -2,7 +2,7 @@ use super::common::{MenuCursor, UiAssets};
 use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy_ui_build_macros::{build_ui, rect, size, style, unit};
-use bevy_ui_navigation::{event_helpers::NavEventQuery, Focusable};
+use bevy_ui_navigation::prelude::*;
 
 use crate::{cleanup_marked, state::GameState, EndReason, GameOver};
 
@@ -99,11 +99,12 @@ fn handle_gameover_event(
 }
 
 fn update(
-    mut nav_events: NavEventQuery<&Button>,
+    mut nav_events: EventReader<NavEvent>,
+    buttons: Query<&Button>,
     mut state: ResMut<State<GameState>>,
     mut app_exit: EventWriter<AppExit>,
 ) {
-    match nav_events.single_activated().unwrap_opt() {
+    match nav_events.nav_iter().activated_in_query(&buttons).next() {
         Some(Button::ExitApp) => app_exit.send(AppExit),
         Some(Button::Restart) => state.set(GameState::Playing).unwrap(),
         Some(Button::MainMenu) => state.set(GameState::MainMenu).unwrap(),

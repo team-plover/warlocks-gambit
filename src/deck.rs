@@ -139,7 +139,7 @@ fn update_meshes(
     let mut update_deck = |entity, card_count| {
         let (handle, mut visibility) = meshes_q.get_mut(entity).ok()?;
         visibility.is_visible = card_count != 0;
-        let mesh = meshes.get_mut(handle.clone())?;
+        let mesh = meshes.get_mut(handle)?;
         if let Float32x3(positions) = mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION)? {
             for pos in positions.iter_mut().filter(|v| v[1] > -0.901) {
                 pos[1] = card_count as f32 / 18.0 - 0.9;
@@ -183,7 +183,7 @@ fn load_decks(
     decks: Res<Assets<Deck>>,
 ) {
     for (to_load, handle, name) in unloaded_decks.iter() {
-        if let Some(deck) = decks.get(handle.clone_weak()) {
+        if let Some(deck) = decks.get(handle) {
             let mut cmds = cmds.entity(to_load);
             match name.as_str() {
                 "PlayerDeck" => cmds.insert(PlayerDeck::new(deck.clone())),

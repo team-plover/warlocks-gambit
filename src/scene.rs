@@ -9,7 +9,7 @@ use bevy::{
     prelude::{Plugin as BevyPlugin, *},
 };
 use bevy_mod_raycast::{RayCastMesh, RayCastSource};
-use bevy_scene_hook::{HookingSceneSpawner, HookPlugin};
+use bevy_scene_hook::{HookedSceneBundle, SceneHook};
 
 use crate::{
     animate::Animated,
@@ -95,6 +95,7 @@ fn hook(
                         Name::new(participant.name().to_owned() + " score"),
                         Number::new(0, participant.color()),
                     ));
+                    cmds.insert_bundle(SpatialBundle { transform, ..default() });
 
                     match participant {
                         Oppo => cmds.insert(OppoScore),
@@ -112,18 +113,25 @@ fn hook(
 }
 fn load_scene(
     mut cmds: Commands,
-    mut scene_spawner: HookingSceneSpawner,
     card_meshes: Res<CardCollisionAssets>,
     decks: Res<DeckAssets>,
     asset_server: Res<AssetServer>,
 ) {
     let card_meshes = card_meshes.clone();
     let decks = decks.clone();
-    let result = scene_spawner.with_comp_hook(
-        asset_server.load("scene.glb#Scene0"),
-        move |name: &Name, cmds| hook(&card_meshes, &decks, name.as_str(), cmds),
-    );
-    cmds.entity(result).insert(Graveyard);
+    cmds.spawn_bundle(HookedSceneBundle {
+        hook: SceneHook::new(
+            move |entity, cmds| match entity.get::<Name>().map(|n| n.as_str()) {
+                Some(name) => hook(&card_meshes, &decks, name, cmds),
+                _ => {}
+            },
+        ),
+        scene: SceneBundle {
+            scene: asset_server.load("scene.glb#Scene0"),
+            ..default()
+        },
+    })
+    .insert(Graveyard);
 }
 
 pub struct Plugin;

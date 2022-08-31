@@ -138,7 +138,7 @@ fn follow_sleeve(
 ) {
     let card_speed = 10.0 * time.delta_seconds();
     for mut transform in cards.iter_mut() {
-        let sleeve_pos = sleeve.single();
+        let sleeve_pos = sleeve.single().compute_transform();
         let target = sleeve_pos.translation;
         let origin = transform.translation;
         transform.translation += (target - origin) * card_speed;

@@ -48,11 +48,8 @@ impl FromWorld for UiAssets {
 fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
     let text_sized = |content: &str, font_size| {
         let color = Color::NAVY;
-        let horizontal = HorizontalAlign::Left;
         let style = TextStyle { color, font: ui_assets.font.clone(), font_size };
-        let align = TextAlignment { horizontal, ..Default::default() };
-        let text = Text::with_section(content, style, align);
-        TextBundle { text, ..Default::default() }
+        TextBundle::from_section(content, style)
     };
     let text = |content: &str| text_sized(content, 60.0);
     let node = NodeBundle {
@@ -62,7 +59,7 @@ fn spawn_game_ui(mut cmds: Commands, ui_assets: Res<UiAssets>) {
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
         },
-        ..Default::default()
+        ..default()
     };
     build_ui! {
         #[cmd(cmds)]
@@ -158,9 +155,11 @@ fn update_score(
                     cmds.spawn_bundle((
                         Animated::RiseAndFade { duration: 1.2, direction: Vec3::Y * 2.5 },
                         Number::new(*additional, participant.color()),
-                        Transform::from_translation(Vec3::Y * 2.),
-                        GlobalTransform::default(),
-                    ));
+                    ))
+                    .insert_bundle(SpatialBundle {
+                        transform: Transform::from_translation(Vec3::Y * 2.),
+                        ..default()
+                    });
                 });
             }
             ScoreEvent::Reset => {

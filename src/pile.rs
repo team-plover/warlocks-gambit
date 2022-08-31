@@ -75,6 +75,7 @@ fn move_to_pile(
 ) {
     let card_speed = 10.0 * time.delta_seconds();
     for (pile_transform, Pile { stack, .. }) in piles.iter() {
+        let pile_transform = pile_transform.compute_transform();
         let mut stack_pos = 0_f32;
         for &entity in stack.iter() {
             if let Ok((mut transform, PileCard { offset, .. })) = cards.get_mut(entity) {

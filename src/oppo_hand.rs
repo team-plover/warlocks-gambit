@@ -49,7 +49,7 @@ fn update_oppo_hand(
     time: Res<Time>,
 ) {
     let card_speed = 10.0 * time.delta_seconds();
-    let hand_transform = oppo_hand.single();
+    let hand_transform = oppo_hand.single().compute_transform();
     let hand_pos = hand_transform.translation;
     for (mut transform, OppoCard { index }) in cards.iter_mut() {
         let i_f32 = *index as f32;

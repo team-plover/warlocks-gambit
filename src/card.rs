@@ -84,8 +84,8 @@ impl<'w, 's> SpawnCard<'w, 's> {
 
         let Card { value, word, .. } = card;
         let spawner_transform = match from {
-            Participant::Oppo => self.oppo_deck.single(),
-            Participant::Player => self.player_deck.single(),
+            Participant::Oppo => self.oppo_deck.single().compute_transform(),
+            Participant::Player => self.player_deck.single().compute_transform(),
         };
         let cmds = &mut self.cmds;
         let entity = cmds
@@ -100,31 +100,40 @@ impl<'w, 's> SpawnCard<'w, 's> {
                     rotation: spawner_transform.rotation
                         * Quat::from_euler(XYZ, FRAC_PI_2, 0.0, 0.0),
                 },
+                ComputedVisibility::default(),
+                Visibility::default(),
             ))
             .id();
-        cmds.spawn_bundle(PbrBundle {
-            mesh: self.assets.card.clone(),
-            material: self.assets.frontface.clone(),
-            ..Default::default()
-        })
-        .insert_bundle((Parent(entity), Name::new("Front face")));
-        cmds.spawn_bundle(PbrBundle {
-            mesh: self.assets.card.clone(),
-            material: self.assets.backface.clone(),
-            transform: Transform::from_rotation(Quat::from_rotation_y(PI)),
-            ..Default::default()
-        })
-        .insert_bundle((Parent(entity), Name::new("Back face")));
+        let child = cmds
+            .spawn_bundle(PbrBundle {
+                mesh: self.assets.card.clone(),
+                material: self.assets.frontface.clone(),
+                ..default()
+            })
+            .insert(Name::new("Front face"))
+            .id();
+        cmds.entity(entity).add_child(child);
+
+        let child = cmds
+            .spawn_bundle(PbrBundle {
+                mesh: self.assets.card.clone(),
+                material: self.assets.backface.clone(),
+                transform: Transform::from_rotation(Quat::from_rotation_y(PI)),
+                ..default()
+            })
+            .insert(Name::new("Back face"))
+            .id();
+        cmds.entity(entity).add_child(child);
 
         let mut spawn_pbr = |name, pbr| {
-            cmds.spawn_bundle(pbr)
-                .insert_bundle((Parent(entity), Name::new(name)))
-                .id()
+            let child = cmds.spawn_bundle(pbr).insert(Name::new(name)).id();
+            cmds.entity(entity).add_child(child);
+            child
         };
         let default_card_pbr = |material: &Handle<StandardMaterial>| PbrBundle {
             mesh: self.assets.quad.clone(),
             material: material.clone(),
-            ..Default::default()
+            ..default()
         };
         #[rustfmt::skip]
         let graphics = CardGraphics {
@@ -174,7 +183,7 @@ fn update_card_graphics(
             if vis.is_visible {
                 let col = word.color();
                 screen_print!(sec: 1, col: col, "Swapping color of card with {word:?}");
-                let mut mat = mat_assets.get_mut(mat.clone()).unwrap();
+                let mut mat = mat_assets.get_mut(&*mat).unwrap();
                 mat.emissive = col;
             }
         }
@@ -202,7 +211,7 @@ impl FromWorld for CardAssets {
                     base_color_texture: Some(image),
                     $(alpha_mode: $alpha_mask,)?
                     $(emissive: $emissive,)?
-                    ..Default::default()
+                    ..default()
                 })
             }};
         }

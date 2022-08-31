@@ -60,11 +60,12 @@ fn display_number(
     mut mats: ResMut<Assets<StandardMaterial>>,
 ) {
     let mut decimal_streams: HashMap<Entity, _> = HashMap::default();
-    for (Parent(parent), mut transform, mut vis, mut material) in sprites.iter_mut() {
+    for (parent, mut transform, mut vis, mut material) in sprites.iter_mut() {
+        let parent = parent.get();
         // We only do things for numbers which value changed
-        if let Ok(Number { value, color }) = numbers.get(*parent) {
+        if let Ok(Number { value, color }) = numbers.get(parent) {
             let initial_iter = || decimals(*value).enumerate();
-            let current_decimal = decimal_streams.entry(*parent).or_insert_with(initial_iter);
+            let current_decimal = decimal_streams.entry(parent).or_insert_with(initial_iter);
             if let Some((i, current)) = current_decimal.next() {
                 vis.is_visible = true;
                 transform.translation.x = i as f32 * -0.9;

@@ -91,6 +91,15 @@ pub struct CardCollisionAssets {
     underlay: Handle<Mesh>,
     pub circle: Handle<Mesh>,
 }
+impl Clone for CardCollisionAssets {
+    fn clone(&self) -> Self {
+        Self {
+            bounding_box: self.bounding_box.clone_weak(),
+            underlay: self.underlay.clone_weak(),
+            circle: self.circle.clone_weak(),
+        }
+    }
+}
 impl FromWorld for CardCollisionAssets {
     fn from_world(world: &mut World) -> Self {
         use bevy::render::{
@@ -172,7 +181,7 @@ fn draw_hand(
     sleeve_cards: Query<Entity, With<SleeveCard>>,
     parents: Query<(Entity, &Parent), (With<Underlay>, With<RayCastMesh<HandRaycast>>)>,
 ) {
-    let underlay_of = |e| parents.iter().find_map(|(c, p)| (p.0 == e).then(|| c));
+    let underlay_of = |e| parents.iter().find_map(|(c, p)| (p.get() == e).then(|| c));
     let unsleeved: Vec<_> = sleeve_cards.iter().collect();
     card_drawer.draw(3 - unsleeved.len());
     for entity in unsleeved.into_iter() {
@@ -373,7 +382,7 @@ fn update_hand(
     time: Res<Time>,
 ) {
     let card_speed = 10.0 * time.delta_seconds();
-    let hand_transform = hand.single();
+    let hand_transform = hand.single().compute_transform();
     let (hand_pos, hand_rot) = (hand_transform.translation, hand_transform.rotation);
     let not_dragging = |c: &QueryItem<HoverQuery>| !c.2.dragging;
     for (mut transform, hover, HandCard { index, .. }) in cards.iter_mut().filter(not_dragging) {

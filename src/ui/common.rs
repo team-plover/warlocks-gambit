@@ -1,7 +1,8 @@
 use bevy::math::Vec3Swizzles;
 use bevy::prelude::{Plugin as BevyPlugin, *};
 use bevy_ui_build_macros::{rect, size, style, unit};
-use bevy_ui_navigation::{systems as nav, Focused, NavRequestSystem, NavigationPlugin};
+use bevy_ui_navigation::prelude::*;
+use bevy_ui_navigation::systems::InputMapping;
 
 #[derive(Clone, Component, Default)]
 pub struct MenuCursor {
@@ -11,13 +12,13 @@ pub struct MenuCursor {
 impl MenuCursor {
     fn set_target(&mut self, node: &Node, transform: &GlobalTransform) {
         self.size = node.size * 1.05;
-        self.position = transform.translation.xy() - self.size / 2.0;
+        self.position = transform.translation().xy() - self.size / 2.0;
     }
     pub fn spawn_ui_element(cmds: &mut Commands) -> Entity {
         cmds.spawn_bundle(NodeBundle {
             style: style! { position_type: PositionType::Absolute, size: size!(0 pct, 0 pct), },
             color: UiColor(Color::rgba(1.0, 1.0, 1.0, 0.1)),
-            ..Default::default()
+            ..default()
         })
         .insert_bundle((Self::default(), Name::new("Cursor")))
         .id()
@@ -43,9 +44,7 @@ impl UiAssets {
         let color = Color::ANTIQUE_WHITE;
         let horizontal = HorizontalAlign::Left;
         let style = TextStyle { color, font: self.font.clone(), font_size };
-        let align = TextAlignment { horizontal, ..Default::default() };
-        let text = Text::with_section(content, style, align);
-        TextBundle { text, ..Default::default() }
+        TextBundle::from_section(content, style)
     }
     pub fn large_text(&self, content: &str) -> TextBundle {
         self.text_bundle(content, 60.)
@@ -90,14 +89,9 @@ fn update_highlight(
 pub struct Plugin;
 impl BevyPlugin for Plugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(NavigationPlugin)
+        app.add_plugins(DefaultNavigationPlugins)
+            .insert_resource(InputMapping { focus_follows_mouse: true, ..default() })
             .init_resource::<UiAssets>()
-            .init_resource::<nav::InputMapping>()
-            .add_system(nav::default_mouse_input.before(NavRequestSystem))
             .add_system_to_stage(CoreStage::PostUpdate, update_highlight);
-
-        app.add_startup_system(|mut cmds: Commands| {
-            cmds.spawn_bundle(UiCameraBundle::default());
-        });
     }
 }

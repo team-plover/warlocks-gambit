@@ -335,11 +335,10 @@ fn handle_new_turn(
     if turn_count.0 % 2 == 1 {
         initative.swap();
     }
-    // TODO: use size_hint once bevy#4244 is merged (https://github.com/bevyengine/bevy/pull/4244)
     match initative.0 {
-        _ if hands.iter().count() == 0 => turn.set(TurnState::Draw).unwrap(),
-        Participant::Oppo => turn.set(TurnState::Oppo).unwrap(),
-        Participant::Player => turn.set(TurnState::Player).unwrap(),
+        _ if hands.iter().len() == 0 => turn.overwrite_set(TurnState::Draw).unwrap(),
+        Participant::Oppo => turn.overwrite_set(TurnState::Oppo).unwrap(),
+        Participant::Player => turn.overwrite_set(TurnState::Player).unwrap(),
     };
 }
 
